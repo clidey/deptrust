@@ -131,3 +131,33 @@ jobs:
 
       - name: Publish npm package
         run: npm publish --access public
+
+      - name: Commit stamped source version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          default_branch="${{ github.event.repository.default_branch }}"
+          tmp_dir="$(mktemp -d)"
+          mkdir -p "$tmp_dir/skill"
+          cp package.json "$tmp_dir/package.json"
+          cp .agents/skills/deptrust-package-check/SKILL.md "$tmp_dir/skill/SKILL.md"
+
+          git fetch origin "$default_branch"
+          git checkout "$default_branch"
+          git pull --ff-only origin "$default_branch"
+
+          cp "$tmp_dir/package.json" package.json
+          cp "$tmp_dir/skill/SKILL.md" .agents/skills/deptrust-package-check/SKILL.md
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json .agents/skills/deptrust-package-check/SKILL.md
+
+          if git diff --cached --quiet; then
+            echo "Source version files already match ${{ steps.release.outputs.tag }}"
+            exit 0
+          fi
+
+          git commit -m "chore: release ${{ steps.release.outputs.tag }} [skip ci]"
+          git push origin "HEAD:$default_branch"
