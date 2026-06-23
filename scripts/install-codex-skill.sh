@@ -15,12 +15,12 @@ mkdir -p "$target_root"
 if [[ -e "$target_dir" ]] && ! cmp -s "$source_dir/SKILL.md" "$target_dir/SKILL.md"; then
   backup="$target_dir.bak-$(date +%s)"
   mv "$target_dir" "$backup"
-  echo "Existing skill at $target_dir differed; backed it up to $backup" >&2
+  echo "Found a customized skill at $target_dir, so we saved it to $backup before installing ours." >&2
 else
   rm -rf "$target_dir"
 fi
 cp -R "$source_dir" "$target_dir"
 
-echo "Installed deptrust-package-check skill to $target_dir"
-echo "Restart Codex if the skill does not appear immediately."
+echo "Installed the deptrust-package-check skill to $target_dir."
+echo "If it doesn't show up right away, give Codex a restart."
 

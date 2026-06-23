@@ -169,7 +169,7 @@ async function installBinary(options) {
   }
 
   rmSync(workDir, { recursive: true, force: true });
-  console.log(`Installed deptrust to ${installPath}`);
+  console.log(`Installed deptrust to ${installPath}.`);
   return installPath;
 }
 
@@ -179,7 +179,7 @@ async function confirmInstallPlan(options) {
     return;
   }
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
-    console.log("Non-interactive shell detected; continuing without confirmation. Pass --yes to skip this message.");
+    console.log("No interactive terminal here, so we'll go ahead without asking. Pass --yes to silence this notice.");
     return;
   }
 
@@ -199,14 +199,13 @@ async function maybePromptInstallOptions(options) {
     return;
   }
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
-    console.log("Non-interactive shell detected; installing binary only. Pass --all or specific integration flags to configure agents.");
+    console.log("No interactive terminal here, so we'll just install the binary. Pass --all or specific flags to set up agent integrations too.");
     return;
   }
 
-  console.log("deptrust guided install");
-  console.log("  This installer does not modify files in the current project.");
-  console.log("  It installs the deptrust binary first, then can configure optional user-level agent integrations.");
-  console.log("  Choose optional agent integrations:");
+  console.log("Let's set up deptrust.");
+  console.log("  Nothing in your current project will be touched.");
+  console.log("  We'll install the binary first, then you can pick which agent integrations to add.");
   console.log("");
 
   const rl = createInterface({ input: process.stdin, output: process.stdout });
@@ -232,16 +231,16 @@ async function confirm(rl, question, defaultValue) {
 function printInstallPlan(options) {
   const binaryName = process.platform === "win32" ? "deptrust.exe" : "deptrust";
   const installPath = join(options.binDir, binaryName);
-  console.log("deptrust will install/update user-level files:");
+  console.log("Here's what will be installed or updated (all user-level, nothing in your project):");
   console.log(`  Binary: ${installPath}`);
   if (options.codexSkill) {
     console.log(`  Codex skill: ${join(homedir(), ".agents", "skills", "deptrust-package-check")}`);
   }
   if (options.codexMCP) {
-    console.log(`  Codex MCP: user/global Codex config -> ${installPath} mcp`);
+    console.log(`  Codex MCP: added to your Codex config -> ${installPath} mcp`);
   }
   if (options.claudeCodeMCP) {
-    console.log(`  Claude Code MCP: user config -> ${installPath} mcp`);
+    console.log(`  Claude Code MCP: added to your Claude Code config -> ${installPath} mcp`);
   }
   console.log("");
 }
@@ -270,18 +269,17 @@ async function confirmUninstallPlan(options) {
 function printUninstallPlan(options) {
   const binaryName = process.platform === "win32" ? "deptrust.exe" : "deptrust";
   const installPath = join(options.binDir, binaryName);
-  console.log("deptrust will remove user-level files/settings:");
+  console.log("Here's what will be removed (all user-level, nothing in your project):");
   console.log(`  Binary: ${installPath}`);
   if (options.codexSkill) {
     console.log(`  Codex skill: ${join(homedir(), ".agents", "skills", "deptrust-package-check")}`);
   }
   if (options.codexMCP) {
-    console.log("  Codex MCP: deptrust entry from user/global Codex config");
+    console.log("  Codex MCP: the deptrust entry in your Codex config");
   }
   if (options.claudeCodeMCP) {
-    console.log("  Claude Code MCP: deptrust entry from user config");
+    console.log("  Claude Code MCP: the deptrust entry in your Claude Code config");
   }
-  console.log("  Current project files: none");
   console.log("");
 }
 
@@ -290,7 +288,7 @@ function uninstall(options) {
   const installPath = join(options.binDir, binaryName);
 
   rmSync(installPath, { force: true });
-  console.log(`Removed deptrust binary from ${installPath}`);
+  console.log(`Removed the deptrust binary from ${installPath}.`);
 
   if (options.codexSkill) {
     const skillPath = join(homedir(), ".agents", "skills", "deptrust-package-check");
@@ -298,32 +296,40 @@ function uninstall(options) {
     if (existsSync(skillPath) && !sameSkill(source, skillPath)) {
       const backup = `${skillPath}.bak-${Date.now()}`;
       renameSync(skillPath, backup);
-      console.warn(`Skill at ${skillPath} differed from deptrust's; backed it up to ${backup} instead of deleting`);
+      console.warn(`The skill at ${skillPath} looks customized, so we kept it safe at ${backup} rather than deleting it.`);
     } else {
       rmSync(skillPath, { recursive: true, force: true });
-      console.log(`Removed deptrust-package-check skill from ${skillPath}`);
+      console.log(`Removed the deptrust-package-check skill from ${skillPath}.`);
     }
   }
 
   if (options.codexMCP) {
     if (commandExists("codex")) {
-      runAllowFailure("codex", ["mcp", "remove", "deptrust"]);
-      console.log("Removed deptrust MCP server from Codex if it existed");
+      if (mcpServerRegistered("codex", ["mcp", "list"])) {
+        runAllowFailure("codex", ["mcp", "remove", "deptrust"]);
+        console.log("Removed the deptrust MCP server from Codex.");
+      } else {
+        console.log("Couldn't find a deptrust entry in Codex, so there was nothing to remove.");
+      }
     } else {
-      console.warn("codex command not found; skipping Codex MCP removal");
+      console.warn("Couldn't find the codex command, so we left Codex's MCP config alone.");
     }
   }
 
   if (options.claudeCodeMCP) {
     if (commandExists("claude")) {
-      runAllowFailure("claude", ["mcp", "remove", "deptrust", "--scope", "user"]);
-      console.log("Removed deptrust MCP server from Claude Code if it existed");
+      if (mcpServerRegistered("claude", ["mcp", "list"])) {
+        runAllowFailure("claude", ["mcp", "remove", "deptrust", "--scope", "user"]);
+        console.log("Removed the deptrust MCP server from Claude Code.");
+      } else {
+        console.log("Couldn't find a deptrust entry in Claude Code, so there was nothing to remove.");
+      }
     } else {
-      console.warn("claude command not found; skipping Claude Code MCP removal");
+      console.warn("Couldn't find the claude command, so we left Claude Code's MCP config alone.");
     }
   }
 
-  console.log("Uninstalled deptrust user-level setup.");
+  console.log("All done. deptrust's user-level files are gone, and your project files were left untouched.");
 }
 
 async function withSpinner(label, task) {
@@ -398,13 +404,13 @@ async function maybeInstallSkill(options) {
   if (existsSync(target) && !sameSkill(source, target)) {
     const backup = `${target}.bak-${Date.now()}`;
     renameSync(target, backup);
-    console.warn(`Existing skill at ${target} differed; backed it up to ${backup}`);
+    console.warn(`Found a customized skill at ${target}, so we saved it to ${backup} before installing ours.`);
   } else {
     rmSync(target, { recursive: true, force: true });
   }
   mkdirSync(dirname(target), { recursive: true });
   cpSync(source, target, { recursive: true });
-  console.log(`Installed deptrust-package-check skill to ${target}`);
+  console.log(`Installed the deptrust-package-check skill to ${target}.`);
 }
 
 function sameSkill(source, target) {
@@ -419,26 +425,26 @@ function maybeRegisterMCP(options, installPath) {
   if (options.codexMCP) {
     if (commandExists("codex")) {
       if (mcpServerRegistered("codex", ["mcp", "list"])) {
-        console.warn("deptrust is already registered as a Codex MCP server; skipping. Re-run after `codex mcp remove deptrust` to replace it.");
+        console.warn("deptrust is already set up in Codex, so we left it as-is. To replace it, run `codex mcp remove deptrust` and try again.");
       } else {
         run("codex", ["mcp", "add", "deptrust", "--", installPath, "mcp"]);
-        console.log("Registered deptrust MCP server with Codex");
+        console.log("Connected deptrust to Codex.");
       }
     } else {
-      console.warn("codex command not found; skipping Codex MCP registration");
+      console.warn("Couldn't find the codex command, so we skipped the Codex setup. Install Codex first if you'd like it connected.");
     }
   }
 
   if (options.claudeCodeMCP) {
     if (commandExists("claude")) {
       if (mcpServerRegistered("claude", ["mcp", "list"])) {
-        console.warn("deptrust is already registered as a Claude Code MCP server; skipping. Re-run after `claude mcp remove deptrust` to replace it.");
+        console.warn("deptrust is already set up in Claude Code, so we left it as-is. To replace it, run `claude mcp remove deptrust` and try again.");
       } else {
         run("claude", ["mcp", "add", "--transport", "stdio", "--scope", "user", "deptrust", "--", installPath, "mcp"]);
-        console.log("Registered deptrust MCP server with Claude Code");
+        console.log("Connected deptrust to Claude Code.");
       }
     } else {
-      console.warn("claude command not found; skipping Claude Code MCP registration");
+      console.warn("Couldn't find the claude command, so we skipped the Claude Code setup. Install Claude Code first if you'd like it connected.");
     }
   }
 }
@@ -549,11 +555,11 @@ function requestHeaders() {
 
 function printNextSteps(installPath) {
   console.log(`
-Next checks:
+You're all set. A couple of things to try:
   ${installPath} check npm lodash latest
   ${installPath} mcp
 
-Manual MCP config:
+If you'd rather wire up MCP by hand, point your client at:
   command = "${installPath}"
   args = ["mcp"]
 `);

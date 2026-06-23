@@ -82,7 +82,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "Building deptrust..."
+echo "Building deptrust from source..."
 version="$(cd "$repo_root" && git describe --tags --always --dirty 2>/dev/null || printf 'dev')"
 commit="$(cd "$repo_root" && git rev-parse --short HEAD 2>/dev/null || printf 'unknown')"
 date="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
@@ -91,7 +91,7 @@ ldflags="-s -w -X github.com/clidey/deptrust/internal/buildinfo.Version=$version
 
 install_path="$bin_dir/deptrust"
 install -m 0755 "$tmp_bin" "$install_path"
-echo "Installed deptrust to $install_path"
+echo "Installed deptrust to $install_path."
 
 if $install_codex_skill; then
   "$repo_root/scripts/install-codex-skill.sh"
@@ -103,41 +103,41 @@ mcp_server_registered() {
 
 if $install_codex_mcp; then
   if ! command -v codex >/dev/null 2>&1; then
-    echo "codex command not found; skipping Codex MCP registration" >&2
+    echo "Couldn't find the codex command, so we skipped the Codex setup. Install Codex first if you'd like it connected." >&2
   elif mcp_server_registered codex; then
-    echo "deptrust is already registered as a Codex MCP server; skipping. Re-run after 'codex mcp remove deptrust' to replace it." >&2
+    echo "deptrust is already set up in Codex, so we left it as-is. To replace it, run 'codex mcp remove deptrust' and try again." >&2
   else
     codex mcp add deptrust -- "$install_path" mcp
-    echo "Registered deptrust MCP server with Codex"
+    echo "Connected deptrust to Codex."
   fi
 fi
 
 if $install_claude_code_mcp; then
   if ! command -v claude >/dev/null 2>&1; then
-    echo "claude command not found; skipping Claude Code MCP registration" >&2
+    echo "Couldn't find the claude command, so we skipped the Claude Code setup. Install Claude Code first if you'd like it connected." >&2
   elif mcp_server_registered claude; then
-    echo "deptrust is already registered as a Claude Code MCP server; skipping. Re-run after 'claude mcp remove deptrust' to replace it." >&2
+    echo "deptrust is already set up in Claude Code, so we left it as-is. To replace it, run 'claude mcp remove deptrust' and try again." >&2
   else
     claude mcp add --transport stdio --scope user deptrust -- "$install_path" mcp
-    echo "Registered deptrust MCP server with Claude Code"
+    echo "Connected deptrust to Claude Code."
   fi
 fi
 
 if $run_check; then
   if [[ ! -x "$install_path" ]]; then
-    echo "Install check failed: $install_path is missing or not executable" >&2
+    echo "Something's off: $install_path is missing or isn't executable." >&2
     exit 1
   fi
-  echo "Install check passed: $install_path is executable"
+  echo "Looks good: $install_path is in place and executable."
 fi
 
 cat <<EOF
 
-Next checks:
+You're all set. A couple of things to try:
   $install_path check npm lodash latest
   $install_path mcp
 
-Manual MCP config:
+If you'd rather wire up MCP by hand, point your client at:
   command = "$install_path"
   args = ["mcp"]
 EOF
@@ -147,8 +147,8 @@ case ":$PATH:" in
   *)
     cat <<EOF
 
-Note: $bin_dir is not currently in PATH.
-Add this to your shell config if you want to run deptrust by name:
+One heads-up: $bin_dir isn't on your PATH yet.
+To run deptrust by name, add this to your shell config:
   export PATH="$bin_dir:\$PATH"
 EOF
     ;;
