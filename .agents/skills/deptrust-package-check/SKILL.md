@@ -14,7 +14,7 @@ Use the local `deptrust` executable to check known vulnerabilities before instal
    - Prefer `./deptrust` in the current repository if present.
    - Otherwise try `deptrust` from `PATH`.
    - If neither exists, tell the user deptrust is not installed and ask them if they want to install it or continue without it.
-   - If they want to install it, suggest to them either `pnpx @clidey/deptrust install --check` or npx (depending on what they're using) or via go `go install github.com/clidey/deptrust/cmd/deptrust@latest`.
+   - If they want to install it, suggest to them either `pnpx @clidey/deptrust@latest install --check` or npx (depending on what they're using) or via go `go install github.com/clidey/deptrust/cmd/deptrust@latest`.
 
 2. Before installing or upgrading a dependency, run:
 

@@ -241,7 +241,7 @@ The easiest install path is `npx` or `pnpx`:
 
 ```bash
 npx @clidey/deptrust install --check
-pnpx @clidey/deptrust install --check
+pnpx @clidey/deptrust@latest install --check
 ```
 
 Go users can install directly:
@@ -256,6 +256,7 @@ To install deptrust and register everything the installer can configure from you
 
 ```bash
 npx @clidey/deptrust install --all
+pnpx @clidey/deptrust@latest install --all
 ```
 
 `--all` installs the binary, registers Codex MCP when the `codex` CLI is available, installs the Codex skill fallback, and registers Claude Code MCP when the `claude` CLI is available.
@@ -266,6 +267,9 @@ Use narrower installs when preferred:
 npx @clidey/deptrust install --codex-mcp
 npx @clidey/deptrust install --claude-code-mcp
 npx @clidey/deptrust skills install
+pnpx @clidey/deptrust@latest install --codex-mcp
+pnpx @clidey/deptrust@latest install --claude-code-mcp
+pnpx @clidey/deptrust@latest skills install
 ```
 
 After MCP setup, ask your agent to use deptrust before dependency changes:
