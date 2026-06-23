@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/clidey/deptrust/internal/app"
+	"github.com/clidey/deptrust/internal/buildinfo"
 	"github.com/clidey/deptrust/internal/mcp"
 	"github.com/clidey/deptrust/internal/risk"
 )
@@ -36,6 +37,9 @@ func run(args []string, stdout, stderr io.Writer) error {
 		return runSuggest(context.Background(), service, args[1:], stdout)
 	case "mcp":
 		return mcp.Serve(context.Background(), service, os.Stdin, stdout)
+	case "version":
+		printVersion(stdout)
+		return nil
 	case "help", "-h", "--help":
 		printUsage(stdout)
 		return nil
@@ -113,6 +117,10 @@ func printCheck(w io.Writer, summary, recommendation string, score int) {
 	fmt.Fprintf(w, "%s\nrecommendation: %s\nrisk_score: %d\n", summary, recommendation, score)
 }
 
+func printVersion(w io.Writer) {
+	fmt.Fprintf(w, "deptrust %s\ncommit: %s\nbuilt: %s\n", buildinfo.Version, buildinfo.Commit, buildinfo.Date)
+}
+
 func printUsage(w io.Writer) {
 	fmt.Fprintln(w, strings.TrimSpace(`
 deptrust checks package versions for known vulnerabilities.
@@ -121,6 +129,7 @@ Usage:
   deptrust check [--json] <ecosystem> <package> [version|latest]
   deptrust suggest [--json] <ecosystem> <package>
   deptrust mcp
+  deptrust version
 
 Examples:
   deptrust check npm lodash 4.17.20

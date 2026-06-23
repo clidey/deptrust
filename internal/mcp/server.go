@@ -8,6 +8,7 @@ import (
 	"io"
 
 	"github.com/clidey/deptrust/internal/app"
+	"github.com/clidey/deptrust/internal/buildinfo"
 	"github.com/clidey/deptrust/internal/models"
 )
 
@@ -90,7 +91,7 @@ func handle(ctx context.Context, service app.App, req request) response {
 				"protocolVersion": protocolVersion,
 				"serverInfo": map[string]any{
 					"name":    "deptrust",
-					"version": "0.1.0",
+					"version": buildinfo.Version,
 				},
 				"capabilities": map[string]any{
 					"tools": map[string]any{},
