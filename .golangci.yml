@@ -1,0 +1,31 @@
+version: "2"
+
+run:
+  go: "1.24"
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+  settings:
+    errcheck:
+      exclude-functions:
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - fmt.Fprint
+      check-type-assertions: false
+  exclusions:
+    rules:
+      - linters: [errcheck]
+        source: "defer "
+      - linters: [errcheck]
+        path: "_test\\.go$"
+      - linters: [staticcheck]
+        text: "SA1019.*deprecated"
+
+formatters:
+  enable:
+    - gofmt

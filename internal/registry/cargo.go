@@ -31,7 +31,9 @@ func resolveCargo(ctx context.Context, client HTTPClient, query models.Query) (V
 		return VersionInfo{}, fmt.Errorf("fetch crates.io metadata: %w", err)
 	}
 	if resp.StatusCode == http.StatusNotFound {
-		resp.Body.Close()
+		if err := resp.Body.Close(); err != nil {
+			return VersionInfo{}, fmt.Errorf("close crates.io metadata response: %w", err)
+		}
 		return VersionInfo{}, PackageNotFoundError{Package: query.Package}
 	}
 

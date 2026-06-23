@@ -1,0 +1,24 @@
+{
+  "name": "@clidey/deptrust",
+  "version": "0.1.0",
+  "description": "Install deptrust, a local package vulnerability checker and MCP server for AI agents.",
+  "license": "MIT",
+  "homepage": "https://github.com/clidey/deptrust",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/clidey/deptrust.git"
+  },
+  "type": "module",
+  "bin": {
+    "deptrust": "./scripts/npm-install.mjs"
+  },
+  "files": [
+    "scripts/npm-install.mjs",
+    ".agents/skills/deptrust-package-check/SKILL.md",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=26"
+  }
+}

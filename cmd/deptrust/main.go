@@ -118,7 +118,7 @@ func printCheck(w io.Writer, summary, recommendation string, score int) {
 }
 
 func printVersion(w io.Writer) {
-	fmt.Fprintf(w, "deptrust %s\ncommit: %s\nbuilt: %s\n", buildinfo.Version, buildinfo.Commit, buildinfo.Date)
+	fmt.Fprintf(w, "deptrust %s\ncommit: %s\nbuilt: %s\n", buildinfo.EffectiveVersion(), buildinfo.Commit, buildinfo.Date)
 }
 
 func printUsage(w io.Writer) {

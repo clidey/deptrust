@@ -90,8 +90,8 @@ jobs:
       - name: Generate release notes
         run: ./scripts/release-notes.sh "${{ steps.release.outputs.tag }}" dist/release-notes.md
 
-      - name: Set npm package version
-        run: npm version --no-git-tag-version "${{ steps.release.outputs.version }}"
+      - name: Stamp npm package and skill version
+        run: node scripts/stamp-release-version.mjs "${{ steps.release.outputs.version }}"
 
       - name: Pack npm installer
         run: npm pack --dry-run

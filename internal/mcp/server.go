@@ -91,7 +91,7 @@ func handle(ctx context.Context, service app.App, req request) response {
 				"protocolVersion": protocolVersion,
 				"serverInfo": map[string]any{
 					"name":    "deptrust",
-					"version": buildinfo.Version,
+					"version": buildinfo.EffectiveVersion(),
 				},
 				"capabilities": map[string]any{
 					"tools": map[string]any{},

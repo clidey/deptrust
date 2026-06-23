@@ -30,7 +30,9 @@ func resolveNPM(ctx context.Context, client HTTPClient, query models.Query) (Ver
 		return VersionInfo{}, fmt.Errorf("fetch npm metadata: %w", err)
 	}
 	if resp.StatusCode == http.StatusNotFound {
-		resp.Body.Close()
+		if err := resp.Body.Close(); err != nil {
+			return VersionInfo{}, fmt.Errorf("close npm metadata response: %w", err)
+		}
 		return VersionInfo{}, PackageNotFoundError{Package: query.Package}
 	}
 
