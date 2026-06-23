@@ -1,0 +1,133 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  release:
+    name: Build and release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release
+        id: release
+        shell: bash
+        run: |
+          git fetch --force --tags
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            latest_tag="$(git tag --list 'v*.*.*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1 || true)"
+            if [[ -z "$latest_tag" ]]; then
+              version="0.1.0"
+            else
+              latest_version="${latest_tag#v}"
+              IFS=. read -r major minor _ <<< "$latest_version"
+              version="$major.$((minor + 1)).0"
+            fi
+            tag="v$version"
+            create_tag="true"
+          else
+            tag="${GITHUB_REF_NAME}"
+            version="${tag#v}"
+            create_tag="false"
+          fi
+
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release tag must look like v0.1.0; got $tag" >&2
+            exit 1
+          fi
+
+          if [[ "$create_tag" == "true" ]]; then
+            if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+              echo "Release tag $tag already exists" >&2
+              exit 1
+            fi
+          elif ! git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "Release tag $tag does not exist in this checkout" >&2
+            exit 1
+          fi
+
+          {
+            echo "tag=$tag"
+            echo "version=$version"
+            echo "create_tag=$create_tag"
+            echo "date=$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Set up Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version-file: go.mod
+
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 26
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build release archives
+        run: ./scripts/build-release.sh "${{ steps.release.outputs.tag }}" "${GITHUB_SHA::7}" "${{ steps.release.outputs.date }}"
+
+      - name: Generate Homebrew formula
+        run: ./scripts/generate-homebrew-formula.sh "${{ steps.release.outputs.tag }}" dist dist/deptrust.rb
+
+      - name: Generate release notes
+        run: ./scripts/release-notes.sh "${{ steps.release.outputs.tag }}" dist/release-notes.md
+
+      - name: Set npm package version
+        run: npm version --no-git-tag-version "${{ steps.release.outputs.version }}"
+
+      - name: Pack npm installer
+        run: npm pack --dry-run
+
+      - name: Create release tag
+        if: steps.release.outputs.create_tag == 'true'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.release.outputs.tag }}" -m "deptrust ${{ steps.release.outputs.tag }}"
+          git push origin "refs/tags/${{ steps.release.outputs.tag }}"
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: deptrust-${{ steps.release.outputs.tag }}
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/checksums.txt
+            dist/deptrust.rb
+            dist/release-notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
+        with:
+          tag_name: ${{ steps.release.outputs.tag }}
+          name: deptrust ${{ steps.release.outputs.tag }}
+          body_path: dist/release-notes.md
+          files: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/checksums.txt
+            dist/deptrust.rb
+          fail_on_unmatched_files: true
+
+      - name: Publish npm package
+        run: npm publish --access public
