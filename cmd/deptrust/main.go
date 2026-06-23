@@ -169,9 +169,15 @@ Examples:
   deptrust check rubygems rails latest
   deptrust check nuget Newtonsoft.Json latest
   deptrust check maven org.apache.logging.log4j:log4j-core latest
+  deptrust check packagist monolog/monolog latest
+  deptrust check pub http latest
+  deptrust check cocoapods AFNetworking latest
+  deptrust check hex plug latest
+  deptrust check hackage aeson latest
+  deptrust check github-actions actions/checkout v7.0.0
   deptrust compare npm lodash 4.17.20 4.17.21
 
-Supported ecosystems: npm, pypi, cargo, go, rubygems, nuget, maven
+Supported ecosystems: npm, pypi, cargo, go, rubygems, nuget, maven, packagist, pub, cocoapods, hex, hackage, github-actions
 `))
 }
 

@@ -60,6 +60,15 @@ func (f fakeOSV) Query(_ context.Context, pkg models.PackageVersion) ([]models.V
 	return f.vulns[pkg.Version], nil
 }
 
+type fakeAwareProvider struct {
+	fakeOSV
+	supported bool
+}
+
+func (f fakeAwareProvider) Supports(models.Ecosystem) bool {
+	return f.supported
+}
+
 func TestSuggestSafeVersionWalksBackFromVulnerableLatest(t *testing.T) {
 	service := App{
 		registry: fakeRegistry{versions: []string{"3.0.0", "2.0.0", "1.0.0"}},
@@ -159,5 +168,24 @@ func TestCheckPackageQueriesProvidersAndDedupes(t *testing.T) {
 	}
 	if len(result.Vulnerabilities) != 1 {
 		t.Fatalf("Vulnerabilities = %#v, want one deduped advisory", result.Vulnerabilities)
+	}
+}
+
+func TestCheckPackageReportsUnsupportedProviderCoverage(t *testing.T) {
+	service := App{
+		registry:  fakeRegistry{versions: []string{"1.0.0"}},
+		providers: []vulnerabilityClient{fakeAwareProvider{supported: false}},
+		now:       time.Now,
+	}
+
+	result, err := service.CheckPackage(context.Background(), models.Query{Ecosystem: models.EcosystemNPM, Package: "pkg", Version: "1.0.0"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Recommendation != risk.RecommendationUnknown {
+		t.Fatalf("Recommendation = %q, want unknown", result.Recommendation)
+	}
+	if len(result.ProviderErrors) != 1 {
+		t.Fatalf("ProviderErrors = %#v, want unsupported coverage error", result.ProviderErrors)
 	}
 }

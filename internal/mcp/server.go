@@ -12,6 +12,7 @@ import (
 )
 
 const protocolVersion = "2025-11-25"
+const ecosystemDescription = "Package ecosystem: npm, pypi, cargo, go, rubygems, nuget, maven, packagist, pub, cocoapods, hex, hackage, or github-actions."
 
 type request struct {
 	JSONRPC string          `json:"jsonrpc"`
@@ -217,7 +218,7 @@ func tools() []map[string]any {
 				"properties": map[string]any{
 					"ecosystem": map[string]any{
 						"type":        "string",
-						"description": "Package ecosystem: npm, pypi, cargo, go, rubygems, nuget, or maven.",
+						"description": ecosystemDescription,
 					},
 					"package": map[string]any{
 						"type":        "string",
@@ -240,7 +241,7 @@ func tools() []map[string]any {
 				"properties": map[string]any{
 					"ecosystem": map[string]any{
 						"type":        "string",
-						"description": "Package ecosystem: npm, pypi, cargo, go, rubygems, nuget, or maven.",
+						"description": ecosystemDescription,
 					},
 					"package": map[string]any{
 						"type":        "string",
@@ -259,7 +260,7 @@ func tools() []map[string]any {
 				"properties": map[string]any{
 					"ecosystem": map[string]any{
 						"type":        "string",
-						"description": "Package ecosystem: npm, pypi, cargo, go, rubygems, nuget, or maven.",
+						"description": ecosystemDescription,
 					},
 					"package": map[string]any{
 						"type":        "string",

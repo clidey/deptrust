@@ -21,6 +21,18 @@ func TestNormalizeEcosystem(t *testing.T) {
 		{input: "dotnet", want: EcosystemNuGet},
 		{input: "maven", want: EcosystemMaven},
 		{input: "java", want: EcosystemMaven},
+		{input: "composer", want: EcosystemPackagist},
+		{input: "php", want: EcosystemPackagist},
+		{input: "pub.dev", want: EcosystemPub},
+		{input: "dart", want: EcosystemPub},
+		{input: "cocoapods", want: EcosystemCocoaPods},
+		{input: "pod", want: EcosystemCocoaPods},
+		{input: "hex.pm", want: EcosystemHex},
+		{input: "elixir", want: EcosystemHex},
+		{input: "hackage", want: EcosystemHackage},
+		{input: "cabal", want: EcosystemHackage},
+		{input: "github-actions", want: EcosystemGitHubActions},
+		{input: "gha", want: EcosystemGitHubActions},
 	}
 
 	for _, tt := range tests {
@@ -35,7 +47,7 @@ func TestNormalizeEcosystem(t *testing.T) {
 }
 
 func TestNormalizeEcosystemRejectsUnsupported(t *testing.T) {
-	if _, err := NormalizeEcosystem("composer"); err == nil {
+	if _, err := NormalizeEcosystem("definitely-not-real"); err == nil {
 		t.Fatal("expected unsupported ecosystem error")
 	}
 }
@@ -53,6 +65,12 @@ func TestEcosystemProviderNames(t *testing.T) {
 		{ecosystem: EcosystemRuby, osv: "RubyGems", github: "rubygems"},
 		{ecosystem: EcosystemNuGet, osv: "NuGet", github: "nuget"},
 		{ecosystem: EcosystemMaven, osv: "Maven", github: "maven"},
+		{ecosystem: EcosystemPackagist, osv: "Packagist", github: "composer"},
+		{ecosystem: EcosystemPub, osv: "Pub", github: "pub"},
+		{ecosystem: EcosystemCocoaPods, osv: "", github: "swift"},
+		{ecosystem: EcosystemHex, osv: "Hex", github: "erlang"},
+		{ecosystem: EcosystemHackage, osv: "Hackage", github: ""},
+		{ecosystem: EcosystemGitHubActions, osv: "GitHub Actions", github: "actions"},
 	}
 
 	for _, tt := range tests {

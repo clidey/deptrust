@@ -30,12 +30,16 @@ type Assessment struct {
 func Score(pkg models.PackageVersion, vulns []models.Vulnerability, signals []models.Signal, providerErrors []models.ProviderError) Assessment {
 	if len(vulns) == 0 && len(signals) == 0 {
 		if len(providerErrors) > 0 {
+			summary := fmt.Sprintf("Could not fully assess %s %s because vulnerability providers returned errors.", pkg.Package, pkg.Version)
+			if hasUnsupportedProviderCoverage(providerErrors) {
+				summary = fmt.Sprintf("Could not fully assess %s %s because no vulnerability provider supports this ecosystem.", pkg.Package, pkg.Version)
+			}
 			return Assessment{
 				RiskScore:      0,
 				Classification: ClassificationUnknown,
 				Recommendation: RecommendationUnknown,
 				SafeToUse:      false,
-				Summary:        fmt.Sprintf("Could not fully assess %s %s because vulnerability providers returned errors.", pkg.Package, pkg.Version),
+				Summary:        summary,
 			}
 		}
 
@@ -79,6 +83,15 @@ func Score(pkg models.PackageVersion, vulns []models.Vulnerability, signals []mo
 		SafeToUse:      recommendation == RecommendationAllow,
 		Summary:        assessmentSummary(pkg, len(vulns), len(signals), maxSeverity, recommendation),
 	}
+}
+
+func hasUnsupportedProviderCoverage(providerErrors []models.ProviderError) bool {
+	for _, item := range providerErrors {
+		if item.Provider == "deptrust" && strings.Contains(item.Message, "no vulnerability provider supports") {
+			return true
+		}
+	}
+	return false
 }
 
 func SeverityRank(severity string) int {

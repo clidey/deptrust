@@ -28,6 +28,10 @@ type vulnerabilityClient interface {
 	Query(ctx context.Context, pkg models.PackageVersion) ([]models.Vulnerability, error)
 }
 
+type ecosystemAwareProvider interface {
+	Supports(ecosystem models.Ecosystem) bool
+}
+
 func New() App {
 	client := &http.Client{Timeout: 15 * time.Second}
 	return App{
@@ -197,15 +201,31 @@ func (a App) queryVulnerabilities(ctx context.Context, pkg models.PackageVersion
 		return nil, nil
 	}
 
+	providers := make([]vulnerabilityClient, 0, len(a.providers))
+	for _, provider := range a.providers {
+		if aware, ok := provider.(ecosystemAwareProvider); ok && !aware.Supports(pkg.Ecosystem) {
+			continue
+		}
+		providers = append(providers, provider)
+	}
+	if len(providers) == 0 {
+		return []models.Vulnerability{}, []models.ProviderError{
+			{
+				Provider: "deptrust",
+				Message:  fmt.Sprintf("no vulnerability provider supports ecosystem %s", pkg.Ecosystem),
+			},
+		}
+	}
+
 	type providerResult struct {
 		provider string
 		vulns    []models.Vulnerability
 		err      error
 	}
 
-	results := make(chan providerResult, len(a.providers))
+	results := make(chan providerResult, len(providers))
 	var wg sync.WaitGroup
-	for _, provider := range a.providers {
+	for _, provider := range providers {
 		wg.Add(1)
 		go func(provider vulnerabilityClient) {
 			defer wg.Done()

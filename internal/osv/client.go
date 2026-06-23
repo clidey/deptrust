@@ -33,6 +33,10 @@ func (c Client) Name() string {
 	return "OSV"
 }
 
+func (c Client) Supports(ecosystem models.Ecosystem) bool {
+	return ecosystem.OSVEcosystem() != ""
+}
+
 type queryRequest struct {
 	Version string       `json:"version"`
 	Package queryPackage `json:"package"`
@@ -97,6 +101,10 @@ type reference struct {
 }
 
 func (c Client) Query(ctx context.Context, pkg models.PackageVersion) ([]models.Vulnerability, error) {
+	if !c.Supports(pkg.Ecosystem) {
+		return nil, nil
+	}
+
 	payload, err := json.Marshal(queryRequest{
 		Version: pkg.Version,
 		Package: queryPackage{

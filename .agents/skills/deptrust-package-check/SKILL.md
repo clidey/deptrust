@@ -1,6 +1,6 @@
 ---
 name: deptrust-package-check
-description: Check package safety with the local deptrust CLI before installing, updating, or recommending npm, PyPI, Cargo, Go module, RubyGems, NuGet, or Maven dependencies. Use when asked to add, upgrade, audit, or evaluate a package version and MCP is unavailable or not configured.
+description: Check package safety with the local deptrust CLI before installing, updating, or recommending npm, PyPI, Cargo, Go module, RubyGems, NuGet, Maven, Packagist, pub.dev, CocoaPods, Hex.pm, Hackage, or GitHub Actions dependencies. Use when asked to add, upgrade, audit, or evaluate a package version and MCP is unavailable or not configured.
 version: "0.3.0"
 ---
 
@@ -31,6 +31,12 @@ Use:
 - `rubygems` for Ruby gems
 - `nuget` for NuGet packages
 - `maven` for Maven artifacts, using `groupId:artifactId` such as `org.apache.logging.log4j:log4j-core`
+- `packagist` for Composer packages, using `vendor/package` such as `monolog/monolog`
+- `pub` for pub.dev packages
+- `cocoapods` for CocoaPods
+- `hex` for Hex.pm packages
+- `hackage` for Hackage packages
+- `github-actions` for GitHub Actions, using `owner/repo` such as `actions/checkout`; use a tag or commit SHA as the version
 
 3. Interpret the JSON:
    - `recommendation: "block"` means do not install that exact version.

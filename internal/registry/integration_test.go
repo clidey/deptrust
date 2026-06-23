@@ -26,6 +26,12 @@ func TestIntegrationResolveLiveRegistries(t *testing.T) {
 		{name: "rubygems", ecosystem: models.EcosystemRuby, pkg: "rails", version: "7.1.0"},
 		{name: "nuget", ecosystem: models.EcosystemNuGet, pkg: "Newtonsoft.Json", version: "13.0.3"},
 		{name: "maven", ecosystem: models.EcosystemMaven, pkg: "com.google.guava:guava", version: models.LatestVersion},
+		{name: "packagist", ecosystem: models.EcosystemPackagist, pkg: "monolog/monolog", version: "3.10.0"},
+		{name: "pub", ecosystem: models.EcosystemPub, pkg: "http", version: "1.6.0"},
+		{name: "cocoapods", ecosystem: models.EcosystemCocoaPods, pkg: "AFNetworking", version: "4.0.1"},
+		{name: "hex", ecosystem: models.EcosystemHex, pkg: "plug", version: models.LatestVersion},
+		{name: "hackage", ecosystem: models.EcosystemHackage, pkg: "aeson", version: models.LatestVersion},
+		{name: "github-actions", ecosystem: models.EcosystemGitHubActions, pkg: "actions/checkout", version: "v7.0.0"},
 	}
 
 	for _, tt := range tests {

@@ -51,6 +51,18 @@ func (r resolver) Resolve(ctx context.Context, query models.Query) (VersionInfo,
 		return resolveNuGet(ctx, r.client, query)
 	case models.EcosystemMaven:
 		return resolveMaven(ctx, r.client, query)
+	case models.EcosystemPackagist:
+		return resolvePackagist(ctx, r.client, query)
+	case models.EcosystemPub:
+		return resolvePub(ctx, r.client, query)
+	case models.EcosystemCocoaPods:
+		return resolveCocoaPods(ctx, r.client, query)
+	case models.EcosystemHex:
+		return resolveHex(ctx, r.client, query)
+	case models.EcosystemHackage:
+		return resolveHackage(ctx, r.client, query)
+	case models.EcosystemGitHubActions:
+		return resolveGitHubActions(ctx, r.client, query)
 	default:
 		return VersionInfo{}, fmt.Errorf("unsupported ecosystem %q", query.Ecosystem)
 	}

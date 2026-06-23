@@ -9,7 +9,7 @@
            /_/
 ```
 
-deptrust is a CLI that checks package versions for known vulnerabilities across npm, PyPI, crates.io, Go modules, RubyGems, NuGet, Maven, and more.
+deptrust is a CLI that checks package versions for known vulnerabilities across npm, PyPI, crates.io, Go modules, RubyGems, NuGet, Maven, Packagist, pub.dev, CocoaPods, Hex.pm, Hackage, GitHub Actions, and more.
 
 It runs locally as a CLI and as an MCP server. It calls public package registry and OSV APIs directly; there is no hosted deptrust service to trust or configure.
 
@@ -37,6 +37,12 @@ Supported ecosystems:
 - RubyGems
 - NuGet
 - Maven, using `groupId:artifactId` package names
+- Packagist / Composer, using `vendor/package` package names
+- pub.dev
+- CocoaPods
+- Hex.pm
+- Hackage
+- GitHub Actions, using `owner/repo` package names and tags or commit SHAs as versions
 
 deptrust currently reports known vulnerabilities and gives a simple recommendation:
 
@@ -56,6 +62,8 @@ Advisory providers are queried in parallel:
 
 - OSV
 - GitHub Advisory Database, including reviewed advisories and malware advisories
+
+Provider coverage varies by ecosystem. If deptrust can resolve registry metadata but no configured vulnerability provider supports that ecosystem, it returns `unknown` instead of treating the package as safe.
 
 ## CLI Usage
 
@@ -97,6 +105,17 @@ Check RubyGems, NuGet, or Maven:
 deptrust check rubygems rails latest
 deptrust check nuget Newtonsoft.Json latest
 deptrust check maven org.apache.logging.log4j:log4j-core latest
+```
+
+Check Packagist, pub.dev, CocoaPods, Hex.pm, Hackage, or GitHub Actions:
+
+```bash
+deptrust check packagist monolog/monolog latest
+deptrust check pub http latest
+deptrust check cocoapods AFNetworking latest
+deptrust check hex plug latest
+deptrust check hackage aeson latest
+deptrust check github-actions actions/checkout v7.0.0
 ```
 
 Example JSON response:
@@ -333,7 +352,7 @@ If you do not want MCP, install the bundled Codex skill:
 npx @clidey/deptrust skills install
 ```
 
-The skill tells Codex to call the `deptrust` CLI before installing, updating, or recommending npm, PyPI, Cargo, Go module, RubyGems, NuGet, and Maven packages.
+The skill tells Codex to call the `deptrust` CLI before installing, updating, or recommending npm, PyPI, Cargo, Go module, RubyGems, NuGet, Maven, Packagist, pub.dev, CocoaPods, Hex.pm, Hackage, and GitHub Actions packages.
 
 ## Troubleshooting
 

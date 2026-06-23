@@ -85,11 +85,18 @@ func parseTime(value string) *time.Time {
 	if value == "" {
 		return nil
 	}
-	parsed, err := time.Parse(time.RFC3339, value)
-	if err != nil {
-		return nil
+	for _, layout := range []string{
+		time.RFC3339Nano,
+		time.RFC3339,
+		"2006-01-02T15:04:05.999999",
+		"2006-01-02T15:04:05",
+	} {
+		parsed, err := time.Parse(layout, value)
+		if err == nil {
+			return &parsed
+		}
 	}
-	return &parsed
+	return nil
 }
 
 func compareVersion(left, right string) int {

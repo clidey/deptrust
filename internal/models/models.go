@@ -11,13 +11,19 @@ const LatestVersion = "latest"
 type Ecosystem string
 
 const (
-	EcosystemNPM   Ecosystem = "npm"
-	EcosystemPyPI  Ecosystem = "pypi"
-	EcosystemCargo Ecosystem = "cargo"
-	EcosystemGo    Ecosystem = "go"
-	EcosystemRuby  Ecosystem = "rubygems"
-	EcosystemNuGet Ecosystem = "nuget"
-	EcosystemMaven Ecosystem = "maven"
+	EcosystemNPM           Ecosystem = "npm"
+	EcosystemPyPI          Ecosystem = "pypi"
+	EcosystemCargo         Ecosystem = "cargo"
+	EcosystemGo            Ecosystem = "go"
+	EcosystemRuby          Ecosystem = "rubygems"
+	EcosystemNuGet         Ecosystem = "nuget"
+	EcosystemMaven         Ecosystem = "maven"
+	EcosystemPackagist     Ecosystem = "packagist"
+	EcosystemPub           Ecosystem = "pub"
+	EcosystemCocoaPods     Ecosystem = "cocoapods"
+	EcosystemHex           Ecosystem = "hex"
+	EcosystemHackage       Ecosystem = "hackage"
+	EcosystemGitHubActions Ecosystem = "github-actions"
 )
 
 func NormalizeEcosystem(value string) (Ecosystem, error) {
@@ -36,8 +42,20 @@ func NormalizeEcosystem(value string) (Ecosystem, error) {
 		return EcosystemNuGet, nil
 	case "maven", "java", "jvm":
 		return EcosystemMaven, nil
+	case "packagist", "composer", "php":
+		return EcosystemPackagist, nil
+	case "pub", "pub.dev", "dart", "flutter":
+		return EcosystemPub, nil
+	case "cocoapods", "cocoapod", "pod", "pods", "ios":
+		return EcosystemCocoaPods, nil
+	case "hex", "hexpm", "hex.pm", "elixir", "erlang":
+		return EcosystemHex, nil
+	case "hackage", "haskell", "cabal":
+		return EcosystemHackage, nil
+	case "github-actions", "github action", "github actions", "gha", "actions":
+		return EcosystemGitHubActions, nil
 	default:
-		return "", fmt.Errorf("unsupported ecosystem %q; supported ecosystems: npm, pypi, cargo, go, rubygems, nuget, maven", value)
+		return "", fmt.Errorf("unsupported ecosystem %q; supported ecosystems: npm, pypi, cargo, go, rubygems, nuget, maven, packagist, pub, cocoapods, hex, hackage, github-actions", value)
 	}
 }
 
@@ -57,6 +75,18 @@ func (e Ecosystem) OSVEcosystem() string {
 		return "NuGet"
 	case EcosystemMaven:
 		return "Maven"
+	case EcosystemPackagist:
+		return "Packagist"
+	case EcosystemPub:
+		return "Pub"
+	case EcosystemCocoaPods:
+		return ""
+	case EcosystemHex:
+		return "Hex"
+	case EcosystemHackage:
+		return "Hackage"
+	case EcosystemGitHubActions:
+		return "GitHub Actions"
 	default:
 		return string(e)
 	}
@@ -78,6 +108,18 @@ func (e Ecosystem) GitHubEcosystem() string {
 		return "nuget"
 	case EcosystemMaven:
 		return "maven"
+	case EcosystemPackagist:
+		return "composer"
+	case EcosystemPub:
+		return "pub"
+	case EcosystemCocoaPods:
+		return "swift"
+	case EcosystemHex:
+		return "erlang"
+	case EcosystemHackage:
+		return ""
+	case EcosystemGitHubActions:
+		return "actions"
 	default:
 		return string(e)
 	}

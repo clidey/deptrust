@@ -33,6 +33,10 @@ func (c Client) Name() string {
 	return "GitHub Advisory DB"
 }
 
+func (c Client) Supports(ecosystem models.Ecosystem) bool {
+	return ecosystem.GitHubEcosystem() != ""
+}
+
 type advisory struct {
 	GHSAID          string                  `json:"ghsa_id"`
 	CVEID           string                  `json:"cve_id"`
@@ -88,6 +92,10 @@ func (p *patchedVersion) UnmarshalJSON(data []byte) error {
 }
 
 func (c Client) Query(ctx context.Context, pkg models.PackageVersion) ([]models.Vulnerability, error) {
+	if !c.Supports(pkg.Ecosystem) {
+		return nil, nil
+	}
+
 	var out []models.Vulnerability
 	for _, advisoryType := range []string{"reviewed", "malware"} {
 		advisories, err := c.queryType(ctx, pkg, advisoryType)
