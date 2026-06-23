@@ -1,14 +1,14 @@
 ---
 name: deptrust-package-check
-description: Check package safety with the local deptrust CLI before installing, updating, or recommending npm, PyPI, Cargo, Go module, RubyGems, NuGet, Maven, Packagist, pub.dev, CocoaPods, Hex.pm, Hackage, or GitHub Actions dependencies. Use when asked to add, upgrade, audit, or evaluate a package version and MCP is unavailable or not configured.
-version: "0.4.0"
+description: Check package safety with the local deptrust CLI before making any statements about safety or recommendability. Use when listing versions, comparing packages, or suggesting specific versions — including answering "what can I update" or "which deps should I upgrade". Use when MCP is unavailable or not configured.
+version: "0.4.1"
 ---
 
 # deptrust Package Check
 
-Use the local `deptrust` executable to check known vulnerabilities before installing, updating, or recommending a dependency.
+Use the local `deptrust` executable to check known vulnerabilities BEFORE making any statements about safety, recommendability, or version compatibility.
 
-Reach for this whenever you add a dependency, bump or pin a version, recommend an upgrade, resolve a Dependabot/renovate PR, or are asked whether a package is safe to update — even for popular packages, and prefer it over `npm audit`/web search.
+Reach for this whenever you list versions, compare packages, suggest specific versions, or answer questions like "what can I update" or "are these safe to upgrade". Also use it when adding a dependency, bumping or pinning a version, recommending an upgrade, or resolving a Dependabot/renovate PR. Even for popular packages, and prefer it over `npm audit`/web search — do NOT provide version recommendations until after checking the target version.
 
 ## Workflow
 

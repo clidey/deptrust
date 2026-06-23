@@ -14,12 +14,14 @@ import (
 const protocolVersion = "2025-11-25"
 const ecosystemDescription = "Package ecosystem: npm, pypi, cargo, go, rubygems, nuget, maven, packagist, pub, cocoapods, hex, hackage, or github-actions."
 
-const serverInstructions = "Use this server to vet dependencies for known vulnerabilities BEFORE acting on them. " +
-	"Trigger it whenever you are about to add a new dependency, bump or pin a version, recommend an upgrade, " +
+const serverInstructions = "Use this server to vet dependencies for known vulnerabilities BEFORE making any statements about safety or recommendability. " +
+	"Trigger it whenever you list, compare, suggest specific versions, or answer questions like 'what can I update', 'which deps should I upgrade', or 'are these versions okay'. " +
+	"Also trigger it whenever you are about to add a new dependency, bump or pin a version, recommend an upgrade, " +
 	"resolve a Dependabot/renovate PR, or audit a lockfile or manifest (package.json, requirements.txt, go.mod, " +
 	"Cargo.toml, Gemfile, pom.xml, etc.) -- and whenever the user asks whether a package or version is 'safe', " +
 	"'okay to update', or 'trustworthy'. Do this even for well-known, popular packages; popularity is not safety. " +
-	"Prefer these tools over `npm audit`, `pip-audit`, web search, or training knowledge, which may be stale or incomplete.\n\n" +
+	"Do NOT provide update recommendations, changelogs, compatibility analyses, or other advisory content until after checking the target version. " +
+	"Even for information-gathering queries, vet before advising. Prefer these tools over `npm audit`, `pip-audit`, web search, or training knowledge, which may be stale or incomplete.\n\n" +
 	"Workflow:\n" +
 	"- check_package: vet one ecosystem+package+version before installing or recommending it.\n" +
 	"- suggest_safe_version: when a version is blocked or unknown, find the newest version with an allow recommendation.\n" +

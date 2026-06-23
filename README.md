@@ -281,10 +281,12 @@ pnpx @clidey/deptrust@latest install --claude-code-mcp
 pnpx @clidey/deptrust@latest skills install
 ```
 
-After MCP setup, ask your agent to use deptrust before dependency changes:
+After MCP setup, agents will automatically check packages before recommending updates or changes. The MCP server sends instructions to vet all dependency versions — including answering questions like "what can I update" or "which dependencies are safe to upgrade" — before providing recommendations.
+
+If using deptrust in a non-MCP context, remind your agent:
 
 ```text
-Before installing or updating dependencies, check the exact package version with deptrust.
+Before listing, comparing, or recommending specific package versions, check them with deptrust. This includes answering "what can I update" — do not provide version recommendations until after checking for known vulnerabilities.
 ```
 
 ## Manual MCP Setup
