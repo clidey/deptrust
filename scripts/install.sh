@@ -97,9 +97,15 @@ if $install_codex_skill; then
   "$repo_root/scripts/install-codex-skill.sh"
 fi
 
+mcp_server_registered() {
+  "$@" mcp list 2>/dev/null | grep -Eq '(^|[^[:alnum:]_-])deptrust([^[:alnum:]_-]|$)'
+}
+
 if $install_codex_mcp; then
   if ! command -v codex >/dev/null 2>&1; then
     echo "codex command not found; skipping Codex MCP registration" >&2
+  elif mcp_server_registered codex; then
+    echo "deptrust is already registered as a Codex MCP server; skipping. Re-run after 'codex mcp remove deptrust' to replace it." >&2
   else
     codex mcp add deptrust -- "$install_path" mcp
     echo "Registered deptrust MCP server with Codex"
@@ -109,6 +115,8 @@ fi
 if $install_claude_code_mcp; then
   if ! command -v claude >/dev/null 2>&1; then
     echo "claude command not found; skipping Claude Code MCP registration" >&2
+  elif mcp_server_registered claude; then
+    echo "deptrust is already registered as a Claude Code MCP server; skipping. Re-run after 'claude mcp remove deptrust' to replace it." >&2
   else
     claude mcp add --transport stdio --scope user deptrust -- "$install_path" mcp
     echo "Registered deptrust MCP server with Claude Code"

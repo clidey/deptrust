@@ -12,7 +12,13 @@ if [[ ! -f "$source_dir/SKILL.md" ]]; then
 fi
 
 mkdir -p "$target_root"
-rm -rf "$target_dir"
+if [[ -e "$target_dir" ]] && ! cmp -s "$source_dir/SKILL.md" "$target_dir/SKILL.md"; then
+  backup="$target_dir.bak-$(date +%s)"
+  mv "$target_dir" "$backup"
+  echo "Existing skill at $target_dir differed; backed it up to $backup" >&2
+else
+  rm -rf "$target_dir"
+fi
 cp -R "$source_dir" "$target_dir"
 
 echo "Installed deptrust-package-check skill to $target_dir"

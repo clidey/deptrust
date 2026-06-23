@@ -8,6 +8,8 @@ version: "0.4.0"
 
 Use the local `deptrust` executable to check known vulnerabilities before installing, updating, or recommending a dependency.
 
+Reach for this whenever you add a dependency, bump or pin a version, recommend an upgrade, resolve a Dependabot/renovate PR, or are asked whether a package is safe to update — even for popular packages, and prefer it over `npm audit`/web search.
+
 ## Workflow
 
 1. Find the `deptrust` binary:

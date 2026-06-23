@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { createWriteStream, existsSync, mkdirSync, chmodSync, copyFileSync, rmSync, cpSync, accessSync, constants } from "node:fs";
+import { createWriteStream, existsSync, mkdirSync, chmodSync, copyFileSync, rmSync, cpSync, renameSync, readFileSync, accessSync, constants } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -294,8 +294,15 @@ function uninstall(options) {
 
   if (options.codexSkill) {
     const skillPath = join(homedir(), ".agents", "skills", "deptrust-package-check");
-    rmSync(skillPath, { recursive: true, force: true });
-    console.log(`Removed deptrust-package-check skill from ${skillPath}`);
+    const source = join(packageRoot, ".agents", "skills", "deptrust-package-check");
+    if (existsSync(skillPath) && !sameSkill(source, skillPath)) {
+      const backup = `${skillPath}.bak-${Date.now()}`;
+      renameSync(skillPath, backup);
+      console.warn(`Skill at ${skillPath} differed from deptrust's; backed it up to ${backup} instead of deleting`);
+    } else {
+      rmSync(skillPath, { recursive: true, force: true });
+      console.log(`Removed deptrust-package-check skill from ${skillPath}`);
+    }
   }
 
   if (options.codexMCP) {
@@ -388,17 +395,35 @@ async function maybeInstallSkill(options) {
   if (!existsSync(join(source, "SKILL.md"))) {
     throw new Error("deptrust skill was not included in the npm package");
   }
-  rmSync(target, { recursive: true, force: true });
+  if (existsSync(target) && !sameSkill(source, target)) {
+    const backup = `${target}.bak-${Date.now()}`;
+    renameSync(target, backup);
+    console.warn(`Existing skill at ${target} differed; backed it up to ${backup}`);
+  } else {
+    rmSync(target, { recursive: true, force: true });
+  }
   mkdirSync(dirname(target), { recursive: true });
   cpSync(source, target, { recursive: true });
   console.log(`Installed deptrust-package-check skill to ${target}`);
 }
 
+function sameSkill(source, target) {
+  try {
+    return readFileSync(join(source, "SKILL.md"), "utf8") === readFileSync(join(target, "SKILL.md"), "utf8");
+  } catch {
+    return false;
+  }
+}
+
 function maybeRegisterMCP(options, installPath) {
   if (options.codexMCP) {
     if (commandExists("codex")) {
-      run("codex", ["mcp", "add", "deptrust", "--", installPath, "mcp"]);
-      console.log("Registered deptrust MCP server with Codex");
+      if (mcpServerRegistered("codex", ["mcp", "list"])) {
+        console.warn("deptrust is already registered as a Codex MCP server; skipping. Re-run after `codex mcp remove deptrust` to replace it.");
+      } else {
+        run("codex", ["mcp", "add", "deptrust", "--", installPath, "mcp"]);
+        console.log("Registered deptrust MCP server with Codex");
+      }
     } else {
       console.warn("codex command not found; skipping Codex MCP registration");
     }
@@ -406,12 +431,24 @@ function maybeRegisterMCP(options, installPath) {
 
   if (options.claudeCodeMCP) {
     if (commandExists("claude")) {
-      run("claude", ["mcp", "add", "--transport", "stdio", "--scope", "user", "deptrust", "--", installPath, "mcp"]);
-      console.log("Registered deptrust MCP server with Claude Code");
+      if (mcpServerRegistered("claude", ["mcp", "list"])) {
+        console.warn("deptrust is already registered as a Claude Code MCP server; skipping. Re-run after `claude mcp remove deptrust` to replace it.");
+      } else {
+        run("claude", ["mcp", "add", "--transport", "stdio", "--scope", "user", "deptrust", "--", installPath, "mcp"]);
+        console.log("Registered deptrust MCP server with Claude Code");
+      }
     } else {
       console.warn("claude command not found; skipping Claude Code MCP registration");
     }
   }
+}
+
+function mcpServerRegistered(command, args) {
+  const result = spawnSync(command, args, { encoding: "utf8" });
+  if (result.status !== 0 || typeof result.stdout !== "string") {
+    return false;
+  }
+  return result.stdout.split(/\r?\n/).some((line) => /(^|[^\w-])deptrust([^\w-]|$)/.test(line));
 }
 
 function commandExists(command) {
