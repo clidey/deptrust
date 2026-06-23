@@ -10,7 +10,7 @@
   },
   "type": "module",
   "bin": {
-    "deptrust": "./scripts/npm-install.mjs"
+    "deptrust": "scripts/npm-install.mjs"
   },
   "files": [
     "scripts/npm-install.mjs",
