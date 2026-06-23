@@ -1,11 +1,12 @@
-# DepTrust
+# deptrust
 
-DepTrust is a local MCP server and CLI that lets an AI agent ask whether a
-package version has known vulnerabilities before installing or updating it.
+deptrust is a CLI that checks package versions for known vulnerabilities across npm, PyPI, crates.io, and more.
 
-It is intentionally not a hosted service. The executable runs locally, calls
-public registry and vulnerability APIs directly, and returns an agent-friendly
-recommendation.
+It is a standalone executable that can be run locally.
+
+There is also an MCP server that can be used by tools like Claude Code and Codex to run deptrust and check dependencies before suggesting/installing them.
+
+This tool was born out of the frustration that is AI agents constantly using old versions.
 
 ## Scope
 
@@ -20,25 +21,10 @@ Current data sources:
 - OSV for known vulnerabilities
 - npm, PyPI, and crates.io metadata APIs for version validation and `latest`
 
-Current non-goals:
-
-- no hosted backend
-- no database or persistent cache
-- no package tarball downloads
-- no lockfile scanning
-- no malware or obfuscation heuristics yet
-
 ## Build
 
 ```bash
 go build -o deptrust ./cmd/deptrust
-```
-
-If your Go build cache is outside the writable environment, use a local cache:
-
-```bash
-mkdir -p .cache/go-build
-GOCACHE="$PWD/.cache/go-build" go build -o deptrust ./cmd/deptrust
 ```
 
 ## CLI
@@ -55,7 +41,7 @@ Check the latest version:
 ./deptrust check pypi requests latest
 ```
 
-Emit stable JSON:
+Return as JSON:
 
 ```bash
 ./deptrust check --json cargo serde latest
@@ -130,7 +116,7 @@ are found.
 
 ## Recommendation Policy
 
-DepTrust v1 only evaluates known vulnerabilities.
+DepTrust evaluates known vulnerabilities.
 
 | Highest known severity | Risk score | Recommendation |
 | --- | ---: | --- |
@@ -140,5 +126,4 @@ DepTrust v1 only evaluates known vulnerabilities.
 | low | 20 | allow |
 | none found | 0 | allow |
 
-`allow` means "no blocking known vulnerability was found by the configured
-providers." It does not prove the package is safe.
+`allow` means "no blocking known vulnerability was found and publicly disclosed." It does not prove the package is safe. Exercise caution as usual.
