@@ -42,7 +42,7 @@ Supported ecosystems:
 - CocoaPods
 - Hex.pm
 - Hackage
-- GitHub Actions, using `owner/repo` package names and tags or commit SHAs as versions
+- GitHub Actions, using `owner/repo` package names and tags, branch refs, or commit SHAs as versions
 
 deptrust currently reports known vulnerabilities and gives a simple recommendation:
 
@@ -64,6 +64,31 @@ Advisory providers are queried in parallel:
 - GitHub Advisory Database, including reviewed advisories and malware advisories
 
 Provider coverage varies by ecosystem. If deptrust can resolve registry metadata but no configured vulnerability provider supports that ecosystem, it returns `unknown` instead of treating the package as safe.
+
+Provider coverage:
+
+| Ecosystem | Registry metadata | OSV | GitHub Advisory DB |
+| --- | --- | --- | --- |
+| npm | yes | yes | yes |
+| PyPI | yes | yes | yes |
+| Cargo / crates.io | yes | yes | yes |
+| Go modules | yes | yes | yes |
+| RubyGems | yes | yes | yes |
+| NuGet | yes | yes | yes |
+| Maven | yes | yes | yes |
+| Packagist / Composer | yes | yes | yes |
+| pub.dev | yes | yes | yes |
+| CocoaPods | yes | no | yes |
+| Hex.pm | yes | yes | yes |
+| Hackage | yes | yes | no |
+| GitHub Actions | yes | yes | yes |
+
+The JSON output includes advisory coverage fields:
+
+- `checked_providers`: vulnerability providers deptrust actually queried
+- `skipped_providers`: configured providers skipped because the ecosystem is unsupported
+- `advisory_coverage`: `full`, `partial`, `none`, or `error`
+- `advisory_coverage_reason`: short explanation for the coverage value
 
 ## CLI Usage
 
@@ -116,7 +141,10 @@ deptrust check cocoapods AFNetworking latest
 deptrust check hex plug latest
 deptrust check hackage aeson latest
 deptrust check github-actions actions/checkout v7.0.0
+deptrust check github-actions actions/checkout main
 ```
+
+For GitHub Actions, full commit SHAs are treated as pinned. Full semver tags such as `v4.2.2` are accepted without an extra pinning signal. Major-only tags such as `v4` and branch refs such as `main` are valid refs, but deptrust adds a review signal because they can move.
 
 Example JSON response:
 
@@ -136,6 +164,13 @@ Example JSON response:
   "next_action": "do_not_install; use suggest_safe_version or compare_versions to choose a safer version",
   "summary": "lodash 4.17.20 has 2 known vulnerabilities, including high severity. Block this exact version and prefer a fixed release.",
   "signals": [],
+  "checked_providers": [
+    "OSV",
+    "GitHub Advisory DB"
+  ],
+  "skipped_providers": [],
+  "advisory_coverage": "full",
+  "advisory_coverage_reason": "all configured vulnerability providers were checked",
   "vulnerabilities": [
     {
       "id": "GHSA-35jh-r3h4-6jhm",
@@ -177,6 +212,8 @@ deptrust suggest npm lodash
 ```
 
 If the latest version is not allowed, `suggest` checks older known versions and returns the newest version with an `allow` recommendation.
+
+When advisories include fixed versions, `suggest` checks those provider-reported fixed versions first before walking back through the registry version list.
 
 Compare two versions:
 
@@ -314,15 +351,22 @@ Example compact MCP structured output:
     "unknown": 0
   },
   "highest_severity": "high",
+  "checked_providers": [
+    "OSV",
+    "GitHub Advisory DB"
+  ],
+  "skipped_providers": [],
+  "advisory_coverage": "full",
+  "advisory_coverage_reason": "all configured vulnerability providers were checked",
   "full_response_command": "deptrust check --json npm vite 7.0.0"
 }
 ```
 
-The compact MCP response omits the vulnerability array, advisory `details`, and repeated `references`. Agents should use the counts, highest severity, recommendation, and next action by default. If the user asks for full advisory details, run the `full_response_command`.
+The compact MCP response omits the vulnerability array, advisory `details`, and repeated `references`. Agents should use the counts, highest severity, provider coverage, recommendation, and next action by default. If the user asks for full advisory details, run the `full_response_command`.
 
 ### `suggest_safe_version`
 
-Checks the latest version first. If latest is not allowed, checks older known versions and suggests the newest version with an `allow` recommendation.
+Checks the latest version first. If latest is not allowed, checks provider-reported fixed versions first, then older known versions, and suggests the newest version with an `allow` recommendation.
 
 ```json
 {

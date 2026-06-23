@@ -8,42 +8,48 @@ import (
 )
 
 type compactCheckResult struct {
-	Ecosystem                  models.Ecosystem       `json:"ecosystem"`
-	Package                    string                 `json:"package"`
-	Version                    string                 `json:"version"`
-	LatestVersion              string                 `json:"latest_version,omitempty"`
-	PublishedAt                *time.Time             `json:"published_at,omitempty"`
-	KnownVulnerabilitiesFound  bool                   `json:"known_vulnerabilities_found"`
-	SafeToUse                  bool                   `json:"safe_to_use"`
-	ShouldInstall              bool                   `json:"should_install"`
-	RiskScore                  int                    `json:"risk_score"`
-	Classification             string                 `json:"classification"`
-	Recommendation             string                 `json:"recommendation"`
-	Reason                     string                 `json:"reason"`
-	NextAction                 string                 `json:"next_action"`
-	Summary                    string                 `json:"summary"`
-	VulnerabilityCount         int                    `json:"vulnerability_count"`
-	VulnerabilityCounts        vulnerabilityCounts    `json:"vulnerability_counts"`
-	HighestSeverity            string                 `json:"highest_severity,omitempty"`
-	Signals                    []models.Signal        `json:"signals,omitempty"`
-	ProviderErrors             []models.ProviderError `json:"provider_errors,omitempty"`
-	ResolvedFromVersionRequest string                 `json:"resolved_from_version_request,omitempty"`
-	FullResponseCommand        string                 `json:"full_response_command,omitempty"`
+	Ecosystem                  models.Ecosystem         `json:"ecosystem"`
+	Package                    string                   `json:"package"`
+	Version                    string                   `json:"version"`
+	LatestVersion              string                   `json:"latest_version,omitempty"`
+	PublishedAt                *time.Time               `json:"published_at,omitempty"`
+	KnownVulnerabilitiesFound  bool                     `json:"known_vulnerabilities_found"`
+	SafeToUse                  bool                     `json:"safe_to_use"`
+	ShouldInstall              bool                     `json:"should_install"`
+	RiskScore                  int                      `json:"risk_score"`
+	Classification             string                   `json:"classification"`
+	Recommendation             string                   `json:"recommendation"`
+	Reason                     string                   `json:"reason"`
+	NextAction                 string                   `json:"next_action"`
+	Summary                    string                   `json:"summary"`
+	VulnerabilityCount         int                      `json:"vulnerability_count"`
+	VulnerabilityCounts        vulnerabilityCounts      `json:"vulnerability_counts"`
+	HighestSeverity            string                   `json:"highest_severity,omitempty"`
+	Signals                    []models.Signal          `json:"signals,omitempty"`
+	ProviderErrors             []models.ProviderError   `json:"provider_errors,omitempty"`
+	CheckedProviders           []string                 `json:"checked_providers,omitempty"`
+	SkippedProviders           []models.SkippedProvider `json:"skipped_providers,omitempty"`
+	AdvisoryCoverage           string                   `json:"advisory_coverage"`
+	AdvisoryCoverageReason     string                   `json:"advisory_coverage_reason,omitempty"`
+	ResolvedFromVersionRequest string                   `json:"resolved_from_version_request,omitempty"`
+	FullResponseCommand        string                   `json:"full_response_command,omitempty"`
 }
 
 type compactSuggestResult struct {
-	Ecosystem             models.Ecosystem       `json:"ecosystem"`
-	Package               string                 `json:"package"`
-	LatestVersion         string                 `json:"latest_version,omitempty"`
-	SuggestedVersion      string                 `json:"suggested_version,omitempty"`
-	Recommendation        string                 `json:"recommendation"`
-	Summary               string                 `json:"summary"`
-	CheckedVersionCount   int                    `json:"checked_version_count"`
-	SafeAlternatives      []string               `json:"safe_alternatives,omitempty"`
-	LatestVersionResult   *compactCheckResult    `json:"latest_version_result,omitempty"`
-	SuggestedVersionCheck *compactCheckResult    `json:"suggested_version_check,omitempty"`
-	ProviderErrors        []models.ProviderError `json:"provider_errors,omitempty"`
-	FullResponseCommand   string                 `json:"full_response_command,omitempty"`
+	Ecosystem             models.Ecosystem         `json:"ecosystem"`
+	Package               string                   `json:"package"`
+	LatestVersion         string                   `json:"latest_version,omitempty"`
+	SuggestedVersion      string                   `json:"suggested_version,omitempty"`
+	Recommendation        string                   `json:"recommendation"`
+	Summary               string                   `json:"summary"`
+	CheckedVersionCount   int                      `json:"checked_version_count"`
+	SafeAlternatives      []string                 `json:"safe_alternatives,omitempty"`
+	LatestVersionResult   *compactCheckResult      `json:"latest_version_result,omitempty"`
+	SuggestedVersionCheck *compactCheckResult      `json:"suggested_version_check,omitempty"`
+	ProviderErrors        []models.ProviderError   `json:"provider_errors,omitempty"`
+	CheckedProviders      []string                 `json:"checked_providers,omitempty"`
+	SkippedProviders      []models.SkippedProvider `json:"skipped_providers,omitempty"`
+	FullResponseCommand   string                   `json:"full_response_command,omitempty"`
 }
 
 type compactCompareResult struct {
@@ -91,6 +97,10 @@ func compactCheck(result models.CheckResult) compactCheckResult {
 		HighestSeverity:            highestSeverity(result.Vulnerabilities),
 		Signals:                    result.Signals,
 		ProviderErrors:             result.ProviderErrors,
+		CheckedProviders:           result.CheckedProviders,
+		SkippedProviders:           result.SkippedProviders,
+		AdvisoryCoverage:           result.AdvisoryCoverage,
+		AdvisoryCoverageReason:     result.AdvisoryCoverageReason,
 		ResolvedFromVersionRequest: result.ResolvedFromVersionRequest,
 		FullResponseCommand:        command("check", string(result.Ecosystem), result.Package, result.Version),
 	}
@@ -121,6 +131,8 @@ func compactSuggest(result models.SuggestResult) compactSuggestResult {
 		LatestVersionResult:   latest,
 		SuggestedVersionCheck: suggested,
 		ProviderErrors:        result.ProviderErrors,
+		CheckedProviders:      result.CheckedProviders,
+		SkippedProviders:      result.SkippedProviders,
 		FullResponseCommand:   command("suggest", string(result.Ecosystem), result.Package),
 	}
 }

@@ -36,7 +36,7 @@ Use:
 - `cocoapods` for CocoaPods
 - `hex` for Hex.pm packages
 - `hackage` for Hackage packages
-- `github-actions` for GitHub Actions, using `owner/repo` such as `actions/checkout`; use a tag or commit SHA as the version
+- `github-actions` for GitHub Actions, using `owner/repo` such as `actions/checkout`; use a tag, branch ref, or commit SHA as the version, and prefer full commit SHAs or full semver tags over branch refs or major-only tags
 
 3. Interpret the JSON:
    - `recommendation: "block"` means do not install that exact version.

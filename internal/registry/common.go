@@ -30,3 +30,7 @@ func pathEscapeSegments(value string) string {
 	}
 	return strings.Join(parts, "/")
 }
+
+func CompareVersionsForApp(left, right string) int {
+	return compareVersion(left, right)
+}

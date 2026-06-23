@@ -282,6 +282,31 @@ func TestResolveGitHubActionsAcceptsCommitSHA(t *testing.T) {
 	}
 }
 
+func TestResolveGitHubActionsAcceptsExistingBranch(t *testing.T) {
+	client := fakeHTTPClient{responses: map[string]fakeResponse{
+		"/repos/actions/checkout/tags?per_page=100": {
+			status: http.StatusOK,
+			body:   `[{"name":"v7.0.0"}]`,
+		},
+		"/repos/actions/checkout/git/ref/heads/main": {
+			status: http.StatusOK,
+			body:   `{}`,
+		},
+	}}
+
+	got, err := resolveGitHubActions(context.Background(), client, models.Query{
+		Ecosystem: models.EcosystemGitHubActions,
+		Package:   "actions/checkout",
+		Version:   "main",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Version != "main" {
+		t.Fatalf("Version = %q, want main", got.Version)
+	}
+}
+
 func mavenQueryKey(groupID, artifactID string) string {
 	params := url.Values{}
 	params.Set("q", "g:"+groupID+" AND a:"+artifactID)

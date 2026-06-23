@@ -32,6 +32,15 @@ type ecosystemAwareProvider interface {
 	Supports(ecosystem models.Ecosystem) bool
 }
 
+type vulnerabilityQueryResult struct {
+	Vulnerabilities  []models.Vulnerability
+	ProviderErrors   []models.ProviderError
+	CheckedProviders []string
+	SkippedProviders []models.SkippedProvider
+	AdvisoryCoverage string
+	CoverageReason   string
+}
+
 func New() App {
 	client := &http.Client{Timeout: 15 * time.Second}
 	return App{
@@ -74,7 +83,9 @@ func (a App) checkResolved(ctx context.Context, resolved registry.VersionInfo) m
 		PublishedAt: resolved.PublishedAt,
 	}
 
-	vulns, providerErrors := a.queryVulnerabilities(ctx, pkg)
+	vulnResult := a.queryVulnerabilities(ctx, pkg)
+	vulns := vulnResult.Vulnerabilities
+	providerErrors := vulnResult.ProviderErrors
 	sortVulnerabilities(vulns)
 	signals := a.signals(pkg)
 	assessment := risk.Score(pkg, vulns, signals, providerErrors)
@@ -92,11 +103,15 @@ func (a App) checkResolved(ctx context.Context, resolved registry.VersionInfo) m
 		Classification:            assessment.Classification,
 		Recommendation:            assessment.Recommendation,
 		Reason:                    decisionReason(assessment.Recommendation, vulns, signals, providerErrors),
-		NextAction:                nextAction(assessment.Recommendation, len(vulns), len(signals), len(providerErrors)),
+		NextAction:                nextAction(assessment.Recommendation, len(vulns), signals, len(providerErrors)),
 		Summary:                   assessment.Summary,
 		Signals:                   signals,
 		Vulnerabilities:           vulns,
 		ProviderErrors:            providerErrors,
+		CheckedProviders:          vulnResult.CheckedProviders,
+		SkippedProviders:          vulnResult.SkippedProviders,
+		AdvisoryCoverage:          vulnResult.AdvisoryCoverage,
+		AdvisoryCoverageReason:    vulnResult.CoverageReason,
 	}
 	return result
 }
@@ -115,6 +130,8 @@ func (a App) SuggestSafeVersion(ctx context.Context, query models.Query) (models
 		LatestVersionResult: &latest,
 		CheckedVersions:     []string{latest.Version},
 		ProviderErrors:      latest.ProviderErrors,
+		CheckedProviders:    latest.CheckedProviders,
+		SkippedProviders:    latest.SkippedProviders,
 	}
 
 	if latest.Recommendation == risk.RecommendationAllow {
@@ -130,7 +147,7 @@ func (a App) SuggestSafeVersion(ctx context.Context, query models.Query) (models
 	if err != nil {
 		return models.SuggestResult{}, err
 	}
-	for _, version := range resolved.Versions {
+	for _, version := range preferredFixedVersions(latest.Vulnerabilities, resolved.Versions) {
 		if version == "" || version == latest.Version {
 			continue
 		}
@@ -143,8 +160,36 @@ func (a App) SuggestSafeVersion(ctx context.Context, query models.Query) (models
 			PublishedAt:          resolved.PublishedAtByVersion[version],
 			PublishedAtByVersion: resolved.PublishedAtByVersion,
 		})
-		result.CheckedVersions = append(result.CheckedVersions, candidate.Version)
+		result.CheckedVersions = appendUniqueString(result.CheckedVersions, candidate.Version)
 		result.ProviderErrors = appendProviderErrors(result.ProviderErrors, candidate.ProviderErrors)
+		result.CheckedProviders = appendUniqueStrings(result.CheckedProviders, candidate.CheckedProviders...)
+		result.SkippedProviders = appendSkippedProviders(result.SkippedProviders, candidate.SkippedProviders...)
+		if candidate.Recommendation == risk.RecommendationAllow {
+			result.SuggestedVersion = candidate.Version
+			result.SafeAlternatives = []string{candidate.Version}
+			result.SuggestedVersionCheck = &candidate
+			result.Recommendation = risk.RecommendationAllow
+			result.Summary = fmt.Sprintf("Use %s %s. It is a provider-reported fixed version with an allow recommendation.", candidate.Package, candidate.Version)
+			return result, nil
+		}
+	}
+	for _, version := range resolved.Versions {
+		if version == "" || version == latest.Version || containsString(result.CheckedVersions, version) {
+			continue
+		}
+		candidate := a.checkResolved(ctx, registry.VersionInfo{
+			Ecosystem:            resolved.Ecosystem,
+			Package:              resolved.Package,
+			Version:              version,
+			Latest:               resolved.Latest,
+			Versions:             resolved.Versions,
+			PublishedAt:          resolved.PublishedAtByVersion[version],
+			PublishedAtByVersion: resolved.PublishedAtByVersion,
+		})
+		result.CheckedVersions = appendUniqueString(result.CheckedVersions, candidate.Version)
+		result.ProviderErrors = appendProviderErrors(result.ProviderErrors, candidate.ProviderErrors)
+		result.CheckedProviders = appendUniqueStrings(result.CheckedProviders, candidate.CheckedProviders...)
+		result.SkippedProviders = appendSkippedProviders(result.SkippedProviders, candidate.SkippedProviders...)
 		if candidate.Recommendation == risk.RecommendationAllow {
 			result.SuggestedVersion = candidate.Version
 			result.SafeAlternatives = []string{candidate.Version}
@@ -196,24 +241,41 @@ func (a App) CompareVersions(ctx context.Context, query models.Query, fromVersio
 	return result, nil
 }
 
-func (a App) queryVulnerabilities(ctx context.Context, pkg models.PackageVersion) ([]models.Vulnerability, []models.ProviderError) {
+func (a App) queryVulnerabilities(ctx context.Context, pkg models.PackageVersion) vulnerabilityQueryResult {
 	if len(a.providers) == 0 {
-		return nil, nil
+		return vulnerabilityQueryResult{
+			Vulnerabilities: []models.Vulnerability{},
+			ProviderErrors: []models.ProviderError{{
+				Provider: "deptrust",
+				Message:  "no vulnerability providers configured",
+			}},
+			AdvisoryCoverage: "none",
+			CoverageReason:   "no vulnerability providers configured",
+		}
 	}
 
 	providers := make([]vulnerabilityClient, 0, len(a.providers))
+	var skippedProviders []models.SkippedProvider
 	for _, provider := range a.providers {
 		if aware, ok := provider.(ecosystemAwareProvider); ok && !aware.Supports(pkg.Ecosystem) {
+			skippedProviders = append(skippedProviders, models.SkippedProvider{
+				Provider: provider.Name(),
+				Reason:   fmt.Sprintf("unsupported ecosystem %s", pkg.Ecosystem),
+			})
 			continue
 		}
 		providers = append(providers, provider)
 	}
 	if len(providers) == 0 {
-		return []models.Vulnerability{}, []models.ProviderError{
-			{
+		return vulnerabilityQueryResult{
+			Vulnerabilities: []models.Vulnerability{},
+			ProviderErrors: []models.ProviderError{{
 				Provider: "deptrust",
 				Message:  fmt.Sprintf("no vulnerability provider supports ecosystem %s", pkg.Ecosystem),
-			},
+			}},
+			SkippedProviders: skippedProviders,
+			AdvisoryCoverage: "none",
+			CoverageReason:   "no vulnerability provider supports this ecosystem",
 		}
 	}
 
@@ -238,37 +300,49 @@ func (a App) queryVulnerabilities(ctx context.Context, pkg models.PackageVersion
 
 	var vulns []models.Vulnerability
 	var providerErrors []models.ProviderError
+	var checkedProviders []string
 	for result := range results {
+		checkedProviders = appendUniqueString(checkedProviders, result.provider)
 		if result.err != nil {
 			providerErrors = append(providerErrors, models.ProviderError{Provider: result.provider, Message: result.err.Error()})
 			continue
 		}
 		vulns = append(vulns, result.vulns...)
 	}
-	return dedupeVulnerabilities(vulns), providerErrors
+	vulns = dedupeVulnerabilities(vulns)
+	coverage, reason := advisoryCoverage(checkedProviders, skippedProviders, providerErrors)
+	return vulnerabilityQueryResult{
+		Vulnerabilities:  vulns,
+		ProviderErrors:   providerErrors,
+		CheckedProviders: checkedProviders,
+		SkippedProviders: skippedProviders,
+		AdvisoryCoverage: coverage,
+		CoverageReason:   reason,
+	}
 }
 
 func (a App) signals(pkg models.PackageVersion) []models.Signal {
+	var signals []models.Signal
 	if pkg.PublishedAt == nil {
-		return nil
+		signals = append(signals, githubActionsVersionSignals(pkg)...)
+		return signals
 	}
 	age := a.now().UTC().Sub(pkg.PublishedAt.UTC())
 	if age < 0 {
 		age = 0
 	}
-	if age > 72*time.Hour {
-		return nil
-	}
-	return []models.Signal{
-		{
+	if age <= 72*time.Hour {
+		signals = append(signals, models.Signal{
 			Type:      "recent_release",
 			Severity:  "medium",
 			Score:     30,
 			Message:   fmt.Sprintf("Version was published recently (%s ago). Review before installing brand-new releases.", humanDuration(age)),
 			Source:    "registry",
 			CreatedAt: pkg.PublishedAt,
-		},
+		})
 	}
+	signals = append(signals, githubActionsVersionSignals(pkg)...)
+	return signals
 }
 
 func ParseQuery(ecosystem, packageName, version string) (models.Query, error) {
@@ -328,6 +402,15 @@ func vulnerabilityDedupeKey(vuln models.Vulnerability) string {
 	return vuln.Summary
 }
 
+func containsString(values []string, value string) bool {
+	for _, existing := range values {
+		if strings.EqualFold(existing, value) {
+			return true
+		}
+	}
+	return false
+}
+
 func appendProviderErrors(left, right []models.ProviderError) []models.ProviderError {
 	if len(right) == 0 {
 		return left
@@ -348,6 +431,162 @@ func appendProviderErrors(left, right []models.ProviderError) []models.ProviderE
 	return out
 }
 
+func appendSkippedProviders(left []models.SkippedProvider, right ...models.SkippedProvider) []models.SkippedProvider {
+	if len(right) == 0 {
+		return left
+	}
+	out := append([]models.SkippedProvider{}, left...)
+	seen := map[string]struct{}{}
+	for _, item := range out {
+		seen[item.Provider+"\x00"+item.Reason] = struct{}{}
+	}
+	for _, item := range right {
+		key := item.Provider + "\x00" + item.Reason
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		out = append(out, item)
+		seen[key] = struct{}{}
+	}
+	return out
+}
+
+func appendUniqueStrings(left []string, right ...string) []string {
+	out := append([]string{}, left...)
+	for _, value := range right {
+		out = appendUniqueString(out, value)
+	}
+	return out
+}
+
+func appendUniqueString(values []string, value string) []string {
+	if value == "" {
+		return values
+	}
+	for _, existing := range values {
+		if strings.EqualFold(existing, value) {
+			return values
+		}
+	}
+	return append(values, value)
+}
+
+func preferredFixedVersions(vulns []models.Vulnerability, registryVersions []string) []string {
+	if len(vulns) == 0 {
+		return nil
+	}
+	registrySet := map[string]struct{}{}
+	for _, version := range registryVersions {
+		registrySet[version] = struct{}{}
+	}
+	fixedSet := map[string]struct{}{}
+	for _, vuln := range vulns {
+		for _, fixed := range vuln.FixedVersions {
+			fixed = strings.TrimSpace(fixed)
+			if fixed == "" {
+				continue
+			}
+			if _, ok := registrySet[fixed]; !ok {
+				continue
+			}
+			fixedSet[fixed] = struct{}{}
+		}
+	}
+	fixed := make([]string, 0, len(fixedSet))
+	for version := range fixedSet {
+		fixed = append(fixed, version)
+	}
+	sort.Slice(fixed, func(i, j int) bool {
+		return registry.CompareVersionsForApp(fixed[i], fixed[j]) > 0
+	})
+	return fixed
+}
+
+func advisoryCoverage(checked []string, skipped []models.SkippedProvider, errors []models.ProviderError) (string, string) {
+	switch {
+	case len(checked) == 0:
+		return "none", "no vulnerability provider supports this ecosystem"
+	case len(errors) > 0 && len(errors) == len(checked):
+		return "error", "all checked vulnerability providers returned errors"
+	case len(errors) > 0:
+		return "partial", "some vulnerability providers returned errors"
+	case len(skipped) > 0:
+		return "partial", "some configured vulnerability providers do not support this ecosystem"
+	default:
+		return "full", "all configured vulnerability providers were checked"
+	}
+}
+
+func githubActionsVersionSignals(pkg models.PackageVersion) []models.Signal {
+	if pkg.Ecosystem != models.EcosystemGitHubActions {
+		return nil
+	}
+	version := strings.TrimSpace(pkg.Version)
+	if isFullGitSHA(version) || isExactSemverTag(version) {
+		return nil
+	}
+	if isMajorOnlyGitHubActionTag(version) {
+		return []models.Signal{{
+			Type:     "mutable_action_tag",
+			Severity: "medium",
+			Score:    50,
+			Message:  "GitHub Actions major-version tags such as v4 are mutable. Prefer a full semver tag or a pinned commit SHA.",
+			Source:   "registry",
+		}}
+	}
+	return []models.Signal{{
+		Type:     "unpinned_action_ref",
+		Severity: "medium",
+		Score:    50,
+		Message:  "GitHub Actions refs that are not full semver tags or commit SHAs may move. Prefer a full semver tag or a pinned commit SHA.",
+		Source:   "registry",
+	}}
+}
+
+func isFullGitSHA(value string) bool {
+	if len(value) != 40 {
+		return false
+	}
+	for _, r := range value {
+		if (r < '0' || r > '9') && (r < 'a' || r > 'f') && (r < 'A' || r > 'F') {
+			return false
+		}
+	}
+	return true
+}
+
+func isExactSemverTag(value string) bool {
+	value = strings.TrimPrefix(value, "v")
+	parts := strings.Split(value, ".")
+	if len(parts) != 3 {
+		return false
+	}
+	for _, part := range parts {
+		if part == "" {
+			return false
+		}
+		for _, r := range part {
+			if r < '0' || r > '9' {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func isMajorOnlyGitHubActionTag(value string) bool {
+	value = strings.TrimPrefix(value, "v")
+	if value == "" {
+		return false
+	}
+	for _, r := range value {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
 func decisionReason(recommendation string, vulns []models.Vulnerability, signals []models.Signal, providerErrors []models.ProviderError) string {
 	switch {
 	case len(providerErrors) > 0 && len(vulns) == 0:
@@ -363,15 +602,18 @@ func decisionReason(recommendation string, vulns []models.Vulnerability, signals
 	}
 }
 
-func nextAction(recommendation string, vulnCount, signalCount, providerErrorCount int) string {
+func nextAction(recommendation string, vulnCount int, signals []models.Signal, providerErrorCount int) string {
 	switch recommendation {
 	case risk.RecommendationAllow:
 		return "install"
 	case risk.RecommendationBlock:
 		return "do_not_install; use suggest_safe_version or compare_versions to choose a safer version"
 	case risk.RecommendationReview:
-		if signalCount > 0 && vulnCount == 0 {
+		if hasSignalType(signals, "recent_release") && vulnCount == 0 {
 			return "review_recent_release_before_installing"
+		}
+		if len(signals) > 0 && vulnCount == 0 {
+			return "review_risk_signals_before_installing"
 		}
 		return "review_advisories_before_installing"
 	default:
@@ -380,6 +622,15 @@ func nextAction(recommendation string, vulnCount, signalCount, providerErrorCoun
 		}
 		return "review_before_installing"
 	}
+}
+
+func hasSignalType(signals []models.Signal, signalType string) bool {
+	for _, signal := range signals {
+		if signal.Type == signalType {
+			return true
+		}
+	}
+	return false
 }
 
 func diffVulnerabilities(from, to []models.Vulnerability) ([]models.Vulnerability, []models.Vulnerability) {

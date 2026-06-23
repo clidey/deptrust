@@ -176,6 +176,11 @@ type ProviderError struct {
 	Message  string `json:"message"`
 }
 
+type SkippedProvider struct {
+	Provider string `json:"provider"`
+	Reason   string `json:"reason"`
+}
+
 type Signal struct {
 	Type      string     `json:"type"`
 	Severity  string     `json:"severity"`
@@ -186,38 +191,44 @@ type Signal struct {
 }
 
 type CheckResult struct {
-	Ecosystem                  Ecosystem       `json:"ecosystem"`
-	Package                    string          `json:"package"`
-	Version                    string          `json:"version"`
-	LatestVersion              string          `json:"latest_version,omitempty"`
-	PublishedAt                *time.Time      `json:"published_at,omitempty"`
-	KnownVulnerabilitiesFound  bool            `json:"known_vulnerabilities_found"`
-	SafeToUse                  bool            `json:"safe_to_use"`
-	ShouldInstall              bool            `json:"should_install"`
-	RiskScore                  int             `json:"risk_score"`
-	Classification             string          `json:"classification"`
-	Recommendation             string          `json:"recommendation"`
-	Reason                     string          `json:"reason"`
-	NextAction                 string          `json:"next_action"`
-	Summary                    string          `json:"summary"`
-	Signals                    []Signal        `json:"signals,omitempty"`
-	Vulnerabilities            []Vulnerability `json:"vulnerabilities"`
-	ProviderErrors             []ProviderError `json:"provider_errors,omitempty"`
-	ResolvedFromVersionRequest string          `json:"resolved_from_version_request,omitempty"`
+	Ecosystem                  Ecosystem         `json:"ecosystem"`
+	Package                    string            `json:"package"`
+	Version                    string            `json:"version"`
+	LatestVersion              string            `json:"latest_version,omitempty"`
+	PublishedAt                *time.Time        `json:"published_at,omitempty"`
+	KnownVulnerabilitiesFound  bool              `json:"known_vulnerabilities_found"`
+	SafeToUse                  bool              `json:"safe_to_use"`
+	ShouldInstall              bool              `json:"should_install"`
+	RiskScore                  int               `json:"risk_score"`
+	Classification             string            `json:"classification"`
+	Recommendation             string            `json:"recommendation"`
+	Reason                     string            `json:"reason"`
+	NextAction                 string            `json:"next_action"`
+	Summary                    string            `json:"summary"`
+	Signals                    []Signal          `json:"signals,omitempty"`
+	Vulnerabilities            []Vulnerability   `json:"vulnerabilities"`
+	ProviderErrors             []ProviderError   `json:"provider_errors,omitempty"`
+	CheckedProviders           []string          `json:"checked_providers,omitempty"`
+	SkippedProviders           []SkippedProvider `json:"skipped_providers,omitempty"`
+	AdvisoryCoverage           string            `json:"advisory_coverage"`
+	AdvisoryCoverageReason     string            `json:"advisory_coverage_reason,omitempty"`
+	ResolvedFromVersionRequest string            `json:"resolved_from_version_request,omitempty"`
 }
 
 type SuggestResult struct {
-	Ecosystem             Ecosystem       `json:"ecosystem"`
-	Package               string          `json:"package"`
-	LatestVersion         string          `json:"latest_version,omitempty"`
-	SuggestedVersion      string          `json:"suggested_version,omitempty"`
-	Recommendation        string          `json:"recommendation"`
-	Summary               string          `json:"summary"`
-	CheckedVersions       []string        `json:"checked_versions,omitempty"`
-	SafeAlternatives      []string        `json:"safe_alternatives,omitempty"`
-	LatestVersionResult   *CheckResult    `json:"latest_version_result,omitempty"`
-	SuggestedVersionCheck *CheckResult    `json:"suggested_version_check,omitempty"`
-	ProviderErrors        []ProviderError `json:"provider_errors,omitempty"`
+	Ecosystem             Ecosystem         `json:"ecosystem"`
+	Package               string            `json:"package"`
+	LatestVersion         string            `json:"latest_version,omitempty"`
+	SuggestedVersion      string            `json:"suggested_version,omitempty"`
+	Recommendation        string            `json:"recommendation"`
+	Summary               string            `json:"summary"`
+	CheckedVersions       []string          `json:"checked_versions,omitempty"`
+	SafeAlternatives      []string          `json:"safe_alternatives,omitempty"`
+	LatestVersionResult   *CheckResult      `json:"latest_version_result,omitempty"`
+	SuggestedVersionCheck *CheckResult      `json:"suggested_version_check,omitempty"`
+	ProviderErrors        []ProviderError   `json:"provider_errors,omitempty"`
+	CheckedProviders      []string          `json:"checked_providers,omitempty"`
+	SkippedProviders      []SkippedProvider `json:"skipped_providers,omitempty"`
 }
 
 type CompareResult struct {

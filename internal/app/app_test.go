@@ -44,9 +44,13 @@ func (f fakeRegistry) Resolve(_ context.Context, query models.Query) (registry.V
 type fakeOSV struct {
 	vulns map[string][]models.Vulnerability
 	err   error
+	name  string
 }
 
 func (f fakeOSV) Name() string {
+	if f.name != "" {
+		return f.name
+	}
 	return "fake"
 }
 
@@ -92,6 +96,35 @@ func TestSuggestSafeVersionWalksBackFromVulnerableLatest(t *testing.T) {
 	}
 }
 
+func TestSuggestSafeVersionPrefersFixedVersions(t *testing.T) {
+	service := App{
+		registry: fakeRegistry{versions: []string{"3.0.0", "2.5.0", "2.0.0", "1.0.0"}},
+		providers: []vulnerabilityClient{
+			fakeOSV{vulns: map[string][]models.Vulnerability{
+				"3.0.0": {{
+					ID:            "GHSA-new",
+					Severity:      "high",
+					Source:        "OSV",
+					FixedVersions: []string{"2.5.0"},
+				}},
+				"2.5.0": nil,
+			}},
+		},
+		now: time.Now,
+	}
+
+	result, err := service.SuggestSafeVersion(context.Background(), models.Query{Ecosystem: models.EcosystemNPM, Package: "pkg"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.SuggestedVersion != "2.5.0" {
+		t.Fatalf("SuggestedVersion = %q, want fixed version 2.5.0", result.SuggestedVersion)
+	}
+	if len(result.CheckedVersions) != 2 {
+		t.Fatalf("CheckedVersions = %#v, want latest and fixed version only", result.CheckedVersions)
+	}
+}
+
 func TestCheckPackageAddsRecentReleaseSignal(t *testing.T) {
 	published := time.Date(2026, 6, 22, 12, 0, 0, 0, time.UTC)
 	service := App{
@@ -114,6 +147,31 @@ func TestCheckPackageAddsRecentReleaseSignal(t *testing.T) {
 	}
 	if len(result.Signals) != 1 || result.Signals[0].Type != "recent_release" {
 		t.Fatalf("Signals = %#v, want recent_release", result.Signals)
+	}
+	if result.NextAction != "review_recent_release_before_installing" {
+		t.Fatalf("NextAction = %q, want review_recent_release_before_installing", result.NextAction)
+	}
+}
+
+func TestCheckPackageAddsGitHubActionsMutableTagSignal(t *testing.T) {
+	service := App{
+		registry:  fakeRegistry{versions: []string{"v4", "v4.2.2"}},
+		providers: []vulnerabilityClient{fakeOSV{}},
+		now:       time.Now,
+	}
+
+	result, err := service.CheckPackage(context.Background(), models.Query{Ecosystem: models.EcosystemGitHubActions, Package: "actions/checkout", Version: "v4"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Recommendation != risk.RecommendationReview {
+		t.Fatalf("Recommendation = %q, want review", result.Recommendation)
+	}
+	if len(result.Signals) != 1 || result.Signals[0].Type != "mutable_action_tag" {
+		t.Fatalf("Signals = %#v, want mutable_action_tag", result.Signals)
+	}
+	if result.NextAction != "review_risk_signals_before_installing" {
+		t.Fatalf("NextAction = %q, want review_risk_signals_before_installing", result.NextAction)
 	}
 }
 
@@ -154,10 +212,10 @@ func TestCheckPackageQueriesProvidersAndDedupes(t *testing.T) {
 		providers: []vulnerabilityClient{
 			fakeOSV{vulns: map[string][]models.Vulnerability{
 				"1.0.0": {{ID: "OSV-1", GHSAIDs: []string{"GHSA-same"}, Severity: "high", Source: "OSV"}},
-			}},
+			}, name: "OSV"},
 			fakeOSV{vulns: map[string][]models.Vulnerability{
 				"1.0.0": {{ID: "GHSA-same", GHSAIDs: []string{"GHSA-same"}, Severity: "high", Source: "GitHub Advisory DB"}},
-			}},
+			}, name: "GitHub Advisory DB"},
 		},
 		now: time.Now,
 	}
@@ -168,6 +226,12 @@ func TestCheckPackageQueriesProvidersAndDedupes(t *testing.T) {
 	}
 	if len(result.Vulnerabilities) != 1 {
 		t.Fatalf("Vulnerabilities = %#v, want one deduped advisory", result.Vulnerabilities)
+	}
+	if len(result.CheckedProviders) != 2 {
+		t.Fatalf("CheckedProviders = %#v, want two checked providers", result.CheckedProviders)
+	}
+	if result.AdvisoryCoverage != "full" {
+		t.Fatalf("AdvisoryCoverage = %q, want full", result.AdvisoryCoverage)
 	}
 }
 
@@ -187,5 +251,11 @@ func TestCheckPackageReportsUnsupportedProviderCoverage(t *testing.T) {
 	}
 	if len(result.ProviderErrors) != 1 {
 		t.Fatalf("ProviderErrors = %#v, want unsupported coverage error", result.ProviderErrors)
+	}
+	if result.AdvisoryCoverage != "none" {
+		t.Fatalf("AdvisoryCoverage = %q, want none", result.AdvisoryCoverage)
+	}
+	if len(result.SkippedProviders) != 1 {
+		t.Fatalf("SkippedProviders = %#v, want one skipped provider", result.SkippedProviders)
 	}
 }
