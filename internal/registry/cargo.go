@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"strings"
 
-	"deptrust/internal/models"
+	"github.com/clidey/deptrust/internal/models"
 )
 
 type cargoVersionsMetadata struct {

@@ -1,3 +1,3 @@
-module deptrust
+module github.com/clidey/deptrust
 
-go 1.26
+go 1.24

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"deptrust/internal/models"
+	"github.com/clidey/deptrust/internal/models"
 )
 
 const (

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"deptrust/internal/models"
-	"deptrust/internal/risk"
+	"github.com/clidey/deptrust/internal/models"
+	"github.com/clidey/deptrust/internal/risk"
 )
 
 type HTTPClient interface {

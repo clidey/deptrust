@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"deptrust/internal/models"
+	"github.com/clidey/deptrust/internal/models"
 )
 
 type VersionInfo struct {

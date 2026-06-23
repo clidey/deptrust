@@ -3,7 +3,7 @@ package risk
 import (
 	"testing"
 
-	"deptrust/internal/models"
+	"github.com/clidey/deptrust/internal/models"
 )
 
 func TestScoreNoKnownVulnerabilitiesAllows(t *testing.T) {

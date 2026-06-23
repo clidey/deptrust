@@ -10,9 +10,9 @@ import (
 	"os"
 	"strings"
 
-	"deptrust/internal/app"
-	"deptrust/internal/mcp"
-	"deptrust/internal/risk"
+	"github.com/clidey/deptrust/internal/app"
+	"github.com/clidey/deptrust/internal/mcp"
+	"github.com/clidey/deptrust/internal/risk"
 )
 
 func main() {

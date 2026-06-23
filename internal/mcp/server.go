@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"io"
 
-	"deptrust/internal/app"
-	"deptrust/internal/models"
+	"github.com/clidey/deptrust/internal/app"
+	"github.com/clidey/deptrust/internal/models"
 )
 
-const protocolVersion = "2025-06-18"
+const protocolVersion = "2025-11-25"
 
 type request struct {
 	JSONRPC string          `json:"jsonrpc"`

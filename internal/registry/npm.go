@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"deptrust/internal/models"
+	"github.com/clidey/deptrust/internal/models"
 )
 
 type npmMetadata struct {

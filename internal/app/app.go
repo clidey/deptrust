@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"deptrust/internal/models"
-	"deptrust/internal/osv"
-	"deptrust/internal/registry"
-	"deptrust/internal/risk"
+	"github.com/clidey/deptrust/internal/models"
+	"github.com/clidey/deptrust/internal/osv"
+	"github.com/clidey/deptrust/internal/registry"
+	"github.com/clidey/deptrust/internal/risk"
 )
 
 type App struct {
