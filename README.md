@@ -320,6 +320,8 @@ For Claude Code:
 claude mcp add --transport stdio deptrust -- /absolute/path/to/deptrust mcp
 ```
 
+On `initialize`, the server returns MCP `instructions` telling the agent when to reach for these tools (before adding, bumping, or recommending a dependency, or when asked whether a version is safe to update). Clients that surface server instructions will apply this automatically, so the manual reminder above is optional rather than required.
+
 ## MCP Tools
 
 ### `check_package`

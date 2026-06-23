@@ -14,6 +14,22 @@ import (
 const protocolVersion = "2025-11-25"
 const ecosystemDescription = "Package ecosystem: npm, pypi, cargo, go, rubygems, nuget, maven, packagist, pub, cocoapods, hex, hackage, or github-actions."
 
+const serverInstructions = "Use this server to vet dependencies for known vulnerabilities BEFORE acting on them. " +
+	"Trigger it whenever you are about to add a new dependency, bump or pin a version, recommend an upgrade, " +
+	"resolve a Dependabot/renovate PR, or audit a lockfile or manifest (package.json, requirements.txt, go.mod, " +
+	"Cargo.toml, Gemfile, pom.xml, etc.) -- and whenever the user asks whether a package or version is 'safe', " +
+	"'okay to update', or 'trustworthy'. Do this even for well-known, popular packages; popularity is not safety. " +
+	"Prefer these tools over `npm audit`, `pip-audit`, web search, or training knowledge, which may be stale or incomplete.\n\n" +
+	"Workflow:\n" +
+	"- check_package: vet one ecosystem+package+version before installing or recommending it.\n" +
+	"- suggest_safe_version: when a version is blocked or unknown, find the newest version with an allow recommendation.\n" +
+	"- compare_versions: when moving between two known versions, confirm the target actually improves risk.\n\n" +
+	"Recommendations: 'block' = do not install that version; 'review' = ask the user or pick a safer version; " +
+	"'allow' = no blocking known vulnerability found; 'unknown' = provider failure or incomplete assessment, do NOT treat as safe. " +
+	"When reporting back, include the package, version, recommendation, and the highest-severity advisory IDs found. " +
+	"Boundaries: this checks known public advisories and registry metadata; it does not prove a package is safe, " +
+	"download tarballs, or detect all malware."
+
 type request struct {
 	JSONRPC string          `json:"jsonrpc"`
 	ID      json.RawMessage `json:"id,omitempty"`
@@ -103,6 +119,7 @@ func handle(ctx context.Context, service app.App, req request) response {
 				"capabilities": map[string]any{
 					"tools": map[string]any{},
 				},
+				"instructions": serverInstructions,
 			},
 		}
 	case "tools/list":
@@ -212,7 +229,7 @@ func tools() []map[string]any {
 	return []map[string]any{
 		{
 			"name":        "check_package",
-			"description": "Check whether a package version has known vulnerabilities across OSV and GitHub advisories and return an install recommendation.",
+			"description": "Vet a dependency before adding, installing, pinning, or recommending it. Checks whether a package version has known vulnerabilities across OSV and GitHub advisories and returns an install recommendation (allow, review, block, unknown). Use this for every new dependency or version bump, including popular packages.",
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -235,7 +252,7 @@ func tools() []map[string]any {
 		},
 		{
 			"name":        "suggest_safe_version",
-			"description": "Check package versions across OSV and GitHub advisories and suggest the newest version with an allow recommendation.",
+			"description": "Find a safe version to install when a requested version is blocked, unknown, or you need the newest non-vulnerable release. Checks package versions across OSV and GitHub advisories and suggests the newest version with an allow recommendation.",
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -254,7 +271,7 @@ func tools() []map[string]any {
 		},
 		{
 			"name":        "compare_versions",
-			"description": "Compare two package versions and show whether the target version improves risk.",
+			"description": "Decide whether an upgrade is worth it when moving between two known versions (e.g. evaluating a Dependabot/renovate bump). Compares two package versions and shows whether the target version improves risk.",
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
