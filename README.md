@@ -157,6 +157,7 @@ deptrust version
 The easiest install path is `npx` or `pnpx`:
 
 ```bash
+npx @clidey/deptrust install --check
 pnpx @clidey/deptrust install --check
 ```
 
