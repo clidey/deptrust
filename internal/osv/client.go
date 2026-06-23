@@ -253,7 +253,7 @@ func affectedRanges(affected []affected, pkg models.PackageVersion) ([]string, [
 			continue
 		}
 		for _, rng := range item.Ranges {
-			parts := []string{}
+			var parts []string
 			for _, event := range rng.Events {
 				switch {
 				case event.Introduced != "":

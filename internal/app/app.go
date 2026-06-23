@@ -124,8 +124,7 @@ func ParseQuery(ecosystem, packageName, version string) (models.Query, error) {
 }
 
 func IsVersionNotFound(err error) (registry.VersionNotFoundError, bool) {
-	var notFound registry.VersionNotFoundError
-	if errors.As(err, &notFound) {
+	if notFound, ok := errors.AsType[registry.VersionNotFoundError](err); ok {
 		return notFound, true
 	}
 	return registry.VersionNotFoundError{}, false
