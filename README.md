@@ -2,9 +2,7 @@
 
 deptrust is a CLI that checks package versions for known vulnerabilities across npm, PyPI, crates.io, and more.
 
-It is a standalone executable that can be run locally.
-
-There is also an MCP server that can be used by tools like Claude Code and Codex to run deptrust and check dependencies before suggesting/installing them.
+It runs locally as a CLI and as an MCP server. It calls public package registry and OSV APIs directly; there is no hosted deptrust service to trust or configure.
 
 This tool was born out of the frustration that is AI agents constantly using old versions.
 
@@ -12,65 +10,101 @@ This tool was born out of the frustration that is AI agents constantly using old
 
 Supported ecosystems:
 
-- npm
+- npm, including scoped packages like `@clidey/ux`
 - PyPI
 - Cargo / crates.io
 
-Current data sources:
+deptrust currently reports known vulnerabilities and gives a simple recommendation:
 
-- OSV for known vulnerabilities
-- npm, PyPI, and crates.io metadata APIs for version validation and `latest`
+| Highest known severity | Recommendation |
+| --- | --- |
+| critical | block |
+| high | block |
+| medium / unknown | review |
+| low | allow |
+| none found | allow |
 
-## Build
+`allow` means no blocking known vulnerability was found in the public data sources. It does not prove that a package is safe.
+
+## Install
+
+The easiest install path is `npx` or `pnpx`:
 
 ```bash
-go build -o deptrust ./cmd/deptrust
+pnpx @clidey/deptrust install --check
 ```
 
-## CLI
+Go users can install directly:
+
+```bash
+go install github.com/clidey/deptrust/cmd/deptrust@latest
+```
+
+## CLI Usage
 
 Check an exact version:
 
 ```bash
-./deptrust check npm lodash 4.17.20
+deptrust check npm lodash 4.17.20
 ```
 
 Check the latest version:
 
 ```bash
-./deptrust check pypi requests latest
+deptrust check pypi requests latest
 ```
 
-Return as JSON:
+Return JSON:
 
 ```bash
-./deptrust check --json cargo serde latest
+deptrust check --json cargo serde latest
 ```
 
 Suggest the latest version only when no known vulnerabilities are found:
 
 ```bash
-./deptrust suggest --json npm lodash
+deptrust suggest npm lodash
 ```
 
-## MCP
-
-Run the MCP stdio server:
+Show the installed version:
 
 ```bash
-./deptrust mcp
+deptrust version
 ```
 
-Use this command in any MCP client that supports stdio servers:
+## Agent Setup
 
-```json
-{
-  "command": "/absolute/path/to/deptrust",
-  "args": ["mcp"]
-}
+To install deptrust and register everything the installer can configure from your terminal:
+
+```bash
+npx @clidey/deptrust install --all
 ```
 
-For clients that use the common `mcpServers` object:
+`--all` installs the binary, registers Codex MCP when the `codex` CLI is available, installs the Codex skill fallback, and registers Claude Code MCP when the `claude` CLI is available.
+
+Use narrower installs when preferred:
+
+```bash
+npx @clidey/deptrust install --codex-mcp
+npx @clidey/deptrust install --claude-code-mcp
+npx @clidey/deptrust skills install
+```
+
+After MCP setup, ask your agent to use deptrust before dependency changes:
+
+```text
+Before installing or updating dependencies, check the exact package version with deptrust.
+```
+
+## Manual MCP Setup
+
+If your client supports stdio MCP servers, configure it to run:
+
+```bash
+/absolute/path/to/deptrust mcp
+```
+
+Many clients use this JSON shape:
 
 ```json
 {
@@ -83,11 +117,23 @@ For clients that use the common `mcpServers` object:
 }
 ```
 
+For Codex, you can also add it with:
+
+```bash
+codex mcp add deptrust -- /absolute/path/to/deptrust mcp
+```
+
+For Claude Code:
+
+```bash
+claude mcp add --transport stdio deptrust -- /absolute/path/to/deptrust mcp
+```
+
 ## MCP Tools
 
 ### `check_package`
 
-Input:
+Checks a package version and returns known vulnerabilities plus a recommendation.
 
 ```json
 {
@@ -97,12 +143,11 @@ Input:
 }
 ```
 
-`version` may be omitted or set to `latest`. If an exact version does not
-exist, DepTrust returns an error and includes the latest version in the message.
+`version` may be omitted or set to `latest`. If an exact version does not exist, deptrust returns an error and suggests the latest explicit version.
 
 ### `suggest_safe_version`
 
-Input:
+Checks the latest version and suggests it only if no known vulnerabilities are found.
 
 ```json
 {
@@ -111,19 +156,30 @@ Input:
 }
 ```
 
-This checks the latest version and suggests it only if no known vulnerabilities
-are found.
+## Skill-Only Use
 
-## Recommendation Policy
+If you do not want MCP, install the bundled Codex skill:
 
-DepTrust evaluates known vulnerabilities.
+```bash
+npx @clidey/deptrust skills install
+```
 
-| Highest known severity | Risk score | Recommendation |
-| --- | ---: | --- |
-| critical | 95 | block |
-| high | 80 | block |
-| medium / unknown | 50 / 40 | review |
-| low | 20 | allow |
-| none found | 0 | allow |
+The skill tells Codex to call the `deptrust` CLI before installing, updating, or recommending npm, PyPI, and Cargo packages.
 
-`allow` means "no blocking known vulnerability was found and publicly disclosed." It does not prove the package is safe. Exercise caution as usual.
+## Troubleshooting
+
+If `deptrust` is not found:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+If an MCP client cannot start the server, find the full path:
+
+```bash
+which deptrust
+```
+
+Then put that absolute path in the MCP config.
+
+If a package check returns `unknown`, do not treat the package as safe. It usually means deptrust could not get a complete answer from a provider.
