@@ -10,6 +10,7 @@ import (
 const (
 	ClassificationNoKnownVulns = "no_known_vulnerabilities"
 	ClassificationVulnerable   = "vulnerable"
+	ClassificationSuspicious   = "suspicious"
 	ClassificationUnknown      = "unknown"
 
 	RecommendationAllow   = "allow"
@@ -26,8 +27,8 @@ type Assessment struct {
 	Summary        string
 }
 
-func Score(pkg models.PackageVersion, vulns []models.Vulnerability, providerErrors []models.ProviderError) Assessment {
-	if len(vulns) == 0 {
+func Score(pkg models.PackageVersion, vulns []models.Vulnerability, signals []models.Signal, providerErrors []models.ProviderError) Assessment {
+	if len(vulns) == 0 && len(signals) == 0 {
 		if len(providerErrors) > 0 {
 			return Assessment{
 				RiskScore:      0,
@@ -56,6 +57,12 @@ func Score(pkg models.PackageVersion, vulns []models.Vulnerability, providerErro
 			maxSeverity = normalizeSeverity(vuln.Severity)
 		}
 	}
+	for _, signal := range signals {
+		if signal.Score > maxScore {
+			maxScore = signal.Score
+			maxSeverity = normalizeSeverity(signal.Severity)
+		}
+	}
 
 	recommendation := RecommendationReview
 	switch {
@@ -67,10 +74,10 @@ func Score(pkg models.PackageVersion, vulns []models.Vulnerability, providerErro
 
 	return Assessment{
 		RiskScore:      maxScore,
-		Classification: ClassificationVulnerable,
+		Classification: classificationFor(vulns, signals),
 		Recommendation: recommendation,
 		SafeToUse:      recommendation == RecommendationAllow,
-		Summary:        vulnerabilitySummary(pkg, len(vulns), maxSeverity, recommendation),
+		Summary:        assessmentSummary(pkg, len(vulns), len(signals), maxSeverity, recommendation),
 	}
 }
 
@@ -108,6 +115,16 @@ func severityScore(severity string) int {
 	}
 }
 
+func classificationFor(vulns []models.Vulnerability, signals []models.Signal) string {
+	if len(vulns) > 0 {
+		return ClassificationVulnerable
+	}
+	if len(signals) > 0 {
+		return ClassificationSuspicious
+	}
+	return ClassificationNoKnownVulns
+}
+
 func normalizeSeverity(severity string) string {
 	normalized := strings.ToLower(strings.TrimSpace(severity))
 	switch normalized {
@@ -120,18 +137,22 @@ func normalizeSeverity(severity string) string {
 	}
 }
 
-func vulnerabilitySummary(pkg models.PackageVersion, count int, maxSeverity string, recommendation string) string {
+func assessmentSummary(pkg models.PackageVersion, vulnCount, signalCount int, maxSeverity string, recommendation string) string {
+	if vulnCount == 0 && signalCount > 0 {
+		return fmt.Sprintf("%s %s has no known vulnerabilities, but %d risk signal was found. Review before installing this exact version.", pkg.Package, pkg.Version, signalCount)
+	}
+
 	vulnWord := "vulnerability"
-	if count != 1 {
+	if vulnCount != 1 {
 		vulnWord = "vulnerabilities"
 	}
 
 	if recommendation == RecommendationBlock {
-		return fmt.Sprintf("%s %s has %d known %s, including %s severity. Block this exact version and prefer a fixed release.", pkg.Package, pkg.Version, count, vulnWord, maxSeverity)
+		return fmt.Sprintf("%s %s has %d known %s, including %s severity. Block this exact version and prefer a fixed release.", pkg.Package, pkg.Version, vulnCount, vulnWord, maxSeverity)
 	}
 	if recommendation == RecommendationAllow {
-		return fmt.Sprintf("%s %s has %d known low severity %s. It is not blocked by the default policy, but review the advisory if this package is security-sensitive.", pkg.Package, pkg.Version, count, vulnWord)
+		return fmt.Sprintf("%s %s has %d known low severity %s. It is not blocked by the default policy, but review the advisory if this package is security-sensitive.", pkg.Package, pkg.Version, vulnCount, vulnWord)
 	}
 
-	return fmt.Sprintf("%s %s has %d known %s, including %s severity. Review before installing this exact version.", pkg.Package, pkg.Version, count, vulnWord, maxSeverity)
+	return fmt.Sprintf("%s %s has %d known %s, including %s severity. Review before installing this exact version.", pkg.Package, pkg.Version, vulnCount, vulnWord, maxSeverity)
 }

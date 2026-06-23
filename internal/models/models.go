@@ -72,10 +72,11 @@ func (q Query) Validate() error {
 }
 
 type PackageVersion struct {
-	Ecosystem Ecosystem `json:"ecosystem"`
-	Package   string    `json:"package"`
-	Version   string    `json:"version"`
-	Latest    string    `json:"latest_version,omitempty"`
+	Ecosystem   Ecosystem  `json:"ecosystem"`
+	Package     string     `json:"package"`
+	Version     string     `json:"version"`
+	Latest      string     `json:"latest_version,omitempty"`
+	PublishedAt *time.Time `json:"published_at,omitempty"`
 }
 
 type Reference struct {
@@ -86,10 +87,13 @@ type Reference struct {
 type Vulnerability struct {
 	ID             string      `json:"id"`
 	Aliases        []string    `json:"aliases,omitempty"`
+	CVEIDs         []string    `json:"cve_ids,omitempty"`
+	GHSAIDs        []string    `json:"ghsa_ids,omitempty"`
 	Severity       string      `json:"severity"`
 	Summary        string      `json:"summary,omitempty"`
 	Details        string      `json:"details,omitempty"`
 	Source         string      `json:"source"`
+	AdvisoryURL    string      `json:"advisory_url,omitempty"`
 	AffectedRanges []string    `json:"affected_ranges,omitempty"`
 	FixedVersions  []string    `json:"fixed_versions,omitempty"`
 	References     []Reference `json:"references,omitempty"`
@@ -102,17 +106,31 @@ type ProviderError struct {
 	Message  string `json:"message"`
 }
 
+type Signal struct {
+	Type      string     `json:"type"`
+	Severity  string     `json:"severity"`
+	Score     int        `json:"score"`
+	Message   string     `json:"message"`
+	Source    string     `json:"source,omitempty"`
+	CreatedAt *time.Time `json:"created_at,omitempty"`
+}
+
 type CheckResult struct {
 	Ecosystem                  Ecosystem       `json:"ecosystem"`
 	Package                    string          `json:"package"`
 	Version                    string          `json:"version"`
 	LatestVersion              string          `json:"latest_version,omitempty"`
+	PublishedAt                *time.Time      `json:"published_at,omitempty"`
 	KnownVulnerabilitiesFound  bool            `json:"known_vulnerabilities_found"`
 	SafeToUse                  bool            `json:"safe_to_use"`
+	ShouldInstall              bool            `json:"should_install"`
 	RiskScore                  int             `json:"risk_score"`
 	Classification             string          `json:"classification"`
 	Recommendation             string          `json:"recommendation"`
+	Reason                     string          `json:"reason"`
+	NextAction                 string          `json:"next_action"`
 	Summary                    string          `json:"summary"`
+	Signals                    []Signal        `json:"signals,omitempty"`
 	Vulnerabilities            []Vulnerability `json:"vulnerabilities"`
 	ProviderErrors             []ProviderError `json:"provider_errors,omitempty"`
 	ResolvedFromVersionRequest string          `json:"resolved_from_version_request,omitempty"`
@@ -126,7 +144,23 @@ type SuggestResult struct {
 	Recommendation        string          `json:"recommendation"`
 	Summary               string          `json:"summary"`
 	CheckedVersions       []string        `json:"checked_versions,omitempty"`
+	SafeAlternatives      []string        `json:"safe_alternatives,omitempty"`
 	LatestVersionResult   *CheckResult    `json:"latest_version_result,omitempty"`
 	SuggestedVersionCheck *CheckResult    `json:"suggested_version_check,omitempty"`
 	ProviderErrors        []ProviderError `json:"provider_errors,omitempty"`
+}
+
+type CompareResult struct {
+	Ecosystem               Ecosystem       `json:"ecosystem"`
+	Package                 string          `json:"package"`
+	FromVersion             string          `json:"from_version"`
+	ToVersion               string          `json:"to_version"`
+	ImprovesRisk            bool            `json:"improves_risk"`
+	Recommendation          string          `json:"recommendation"`
+	Summary                 string          `json:"summary"`
+	NextAction              string          `json:"next_action"`
+	From                    CheckResult     `json:"from"`
+	To                      CheckResult     `json:"to"`
+	ResolvedVulnerabilities []Vulnerability `json:"resolved_vulnerabilities,omitempty"`
+	AddedVulnerabilities    []Vulnerability `json:"added_vulnerabilities,omitempty"`
 }

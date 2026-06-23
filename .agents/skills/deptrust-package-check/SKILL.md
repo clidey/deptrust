@@ -42,7 +42,15 @@ deptrust suggest --json <ecosystem> <package>
 
 Use `suggested_version` only when the response recommendation is `allow`.
 
-5. When reporting back, include the package, version, recommendation, and the highest-severity advisory IDs if vulnerabilities were found.
+5. When comparing an installed version to a target version, run:
+
+```bash
+deptrust compare --json <ecosystem> <package> <from-version> <to-version>
+```
+
+Use `next_action` and `improves_risk` to decide whether the upgrade is safer.
+
+6. When reporting back, include the package, version, recommendation, `next_action`, and the highest-severity advisory IDs if vulnerabilities were found.
 
 ## Boundaries
 

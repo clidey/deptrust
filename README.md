@@ -37,6 +37,8 @@ deptrust currently reports known vulnerabilities and gives a simple recommendati
 
 `allow` means no blocking known vulnerability was found in the public data sources. It does not prove that a package is safe.
 
+deptrust also emits risk signals that are not CVEs. For example, a version published in the last 72 hours is marked for review so an agent does not blindly install a brand-new release.
+
 ## CLI Usage
 
 Check an exact version:
@@ -69,23 +71,47 @@ Example JSON response:
 
 ```json
 {
-  "package": {
-    "ecosystem": "npm",
-    "name": "lodash",
-    "version": "4.17.20"
-  },
+  "ecosystem": "npm",
+  "package": "lodash",
+  "version": "4.17.20",
+  "latest_version": "4.17.21",
+  "known_vulnerabilities_found": true,
+  "safe_to_use": false,
+  "should_install": false,
   "risk_score": 80,
   "recommendation": "block",
-  "classification": "compromised",
-  "summary": "npm lodash@4.17.20: 2 known vulnerabilities found",
+  "classification": "vulnerable",
+  "reason": "Found 2 known vulnerability records.",
+  "next_action": "do_not_install; use suggest_safe_version or compare_versions to choose a safer version",
+  "summary": "lodash 4.17.20 has 2 known vulnerabilities, including high severity. Block this exact version and prefer a fixed release.",
+  "signals": [],
   "vulnerabilities": [
     {
       "id": "GHSA-35jh-r3h4-6jhm",
+      "aliases": [
+        "CVE-2021-23337"
+      ],
+      "cve_ids": [
+        "CVE-2021-23337"
+      ],
+      "ghsa_ids": [
+        "GHSA-35jh-r3h4-6jhm"
+      ],
       "summary": "Command Injection in lodash",
       "severity": "high",
       "source": "OSV",
-      "aliases": [
-        "CVE-2021-23337"
+      "advisory_url": "https://github.com/advisories/GHSA-35jh-r3h4-6jhm",
+      "affected_ranges": [
+        "SEMVER: introduced 0, fixed 4.17.21"
+      ],
+      "fixed_versions": [
+        "4.17.21"
+      ],
+      "references": [
+        {
+          "type": "ADVISORY",
+          "url": "https://github.com/advisories/GHSA-35jh-r3h4-6jhm"
+        }
       ]
     }
   ],
@@ -97,6 +123,22 @@ Suggest the latest version only when no known vulnerabilities are found:
 
 ```bash
 deptrust suggest npm lodash
+```
+
+If the latest version is not allowed, `suggest` checks older known versions and returns the newest version with an `allow` recommendation.
+
+Compare two versions:
+
+```bash
+deptrust compare npm lodash 4.17.20 4.17.21
+```
+
+Example compare response:
+
+```text
+lodash 4.17.20 -> 4.17.21 improves risk: score 80 to 0.
+recommendation: allow
+next_action: upgrade_to_target
 ```
 
 Show the installed version:
@@ -194,12 +236,25 @@ Checks a package version and returns known vulnerabilities plus a recommendation
 
 ### `suggest_safe_version`
 
-Checks the latest version and suggests it only if no known vulnerabilities are found.
+Checks the latest version first. If latest is not allowed, checks older known versions and suggests the newest version with an `allow` recommendation.
 
 ```json
 {
   "ecosystem": "npm",
   "package": "lodash"
+}
+```
+
+### `compare_versions`
+
+Compares a current version and target version, including resolved and added vulnerabilities.
+
+```json
+{
+  "ecosystem": "npm",
+  "package": "lodash",
+  "from_version": "4.17.20",
+  "to_version": "4.17.21"
 }
 ```
 

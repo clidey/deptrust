@@ -148,20 +148,64 @@ func convertVulnerability(v vulnerability, pkg models.PackageVersion) models.Vul
 	if severity == "unknown" {
 		severity = inferSeverityFromAliases(v.Aliases)
 	}
+	cves, ghsas := advisoryIDs(v.ID, v.Aliases)
 
 	return models.Vulnerability{
 		ID:             v.ID,
 		Aliases:        v.Aliases,
+		CVEIDs:         cves,
+		GHSAIDs:        ghsas,
 		Severity:       severity,
 		Summary:        v.Summary,
 		Details:        firstParagraph(v.Details),
 		Source:         "OSV",
+		AdvisoryURL:    primaryAdvisoryURL(refs),
 		AffectedRanges: ranges,
 		FixedVersions:  fixedVersions,
 		References:     refs,
 		PublishedAt:    v.Published,
 		ModifiedAt:     v.Modified,
 	}
+}
+
+func advisoryIDs(id string, aliases []string) ([]string, []string) {
+	var cves []string
+	var ghsas []string
+	addID := func(value string) {
+		upper := strings.ToUpper(strings.TrimSpace(value))
+		switch {
+		case strings.HasPrefix(upper, "CVE-"):
+			cves = appendUnique(cves, upper)
+		case strings.HasPrefix(upper, "GHSA-"):
+			ghsas = appendUnique(ghsas, value)
+		}
+	}
+	addID(id)
+	for _, alias := range aliases {
+		addID(alias)
+	}
+	return cves, ghsas
+}
+
+func appendUnique(values []string, value string) []string {
+	for _, existing := range values {
+		if strings.EqualFold(existing, value) {
+			return values
+		}
+	}
+	return append(values, value)
+}
+
+func primaryAdvisoryURL(refs []models.Reference) string {
+	for _, ref := range refs {
+		if strings.EqualFold(ref.Type, "ADVISORY") && ref.URL != "" {
+			return ref.URL
+		}
+	}
+	if len(refs) > 0 {
+		return refs[0].URL
+	}
+	return ""
 }
 
 func bestSeverity(v vulnerability) string {

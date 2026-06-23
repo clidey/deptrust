@@ -35,6 +35,8 @@ func run(args []string, stdout, stderr io.Writer) error {
 		return runCheck(context.Background(), service, args[1:], stdout)
 	case "suggest":
 		return runSuggest(context.Background(), service, args[1:], stdout)
+	case "compare":
+		return runCompare(context.Background(), service, args[1:], stdout)
 	case "mcp":
 		return mcp.Serve(context.Background(), service, os.Stdin, stdout)
 	case "version":
@@ -107,6 +109,33 @@ func runSuggest(ctx context.Context, service app.App, args []string, stdout io.W
 	return nil
 }
 
+func runCompare(ctx context.Context, service app.App, args []string, stdout io.Writer) error {
+	flags := flag.NewFlagSet("compare", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	jsonOutput := flags.Bool("json", false, "emit JSON")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	remaining := flags.Args()
+	if len(remaining) != 4 {
+		return errors.New("usage: deptrust compare [--json] <ecosystem> <package> <from-version> <to-version>")
+	}
+
+	query, err := app.ParseQuery(remaining[0], remaining[1], "")
+	if err != nil {
+		return err
+	}
+	result, err := service.CompareVersions(ctx, query, remaining[2], remaining[3])
+	if err != nil {
+		return err
+	}
+	if *jsonOutput {
+		return writeJSON(stdout, result)
+	}
+	fmt.Fprintf(stdout, "%s\nrecommendation: %s\nnext_action: %s\n", result.Summary, result.Recommendation, result.NextAction)
+	return nil
+}
+
 func writeJSON(w io.Writer, value any) error {
 	encoder := json.NewEncoder(w)
 	encoder.SetIndent("", "  ")
@@ -128,6 +157,7 @@ deptrust checks package versions for known vulnerabilities.
 Usage:
   deptrust check [--json] <ecosystem> <package> [version|latest]
   deptrust suggest [--json] <ecosystem> <package>
+  deptrust compare [--json] <ecosystem> <package> <from-version> <to-version>
   deptrust mcp
   deptrust version
 
@@ -135,6 +165,7 @@ Examples:
   deptrust check npm lodash 4.17.20
   deptrust check --json pypi requests latest
   deptrust suggest cargo serde
+  deptrust compare npm lodash 4.17.20 4.17.21
 
 Supported ecosystems: npm, pypi, cargo
 `))

@@ -7,7 +7,7 @@ import (
 )
 
 func TestScoreNoKnownVulnerabilitiesAllows(t *testing.T) {
-	got := Score(pkg(), nil, nil)
+	got := Score(pkg(), nil, nil, nil)
 	if got.Recommendation != RecommendationAllow {
 		t.Fatalf("recommendation = %q, want %q", got.Recommendation, RecommendationAllow)
 	}
@@ -20,7 +20,7 @@ func TestScoreNoKnownVulnerabilitiesAllows(t *testing.T) {
 }
 
 func TestScoreHighVulnerabilityBlocks(t *testing.T) {
-	got := Score(pkg(), []models.Vulnerability{{Severity: "high"}}, nil)
+	got := Score(pkg(), []models.Vulnerability{{Severity: "high"}}, nil, nil)
 	if got.Recommendation != RecommendationBlock {
 		t.Fatalf("recommendation = %q, want %q", got.Recommendation, RecommendationBlock)
 	}
@@ -33,14 +33,14 @@ func TestScoreHighVulnerabilityBlocks(t *testing.T) {
 }
 
 func TestScoreMediumVulnerabilityReviews(t *testing.T) {
-	got := Score(pkg(), []models.Vulnerability{{Severity: "medium"}}, nil)
+	got := Score(pkg(), []models.Vulnerability{{Severity: "medium"}}, nil, nil)
 	if got.Recommendation != RecommendationReview {
 		t.Fatalf("recommendation = %q, want %q", got.Recommendation, RecommendationReview)
 	}
 }
 
 func TestScoreLowVulnerabilityAllows(t *testing.T) {
-	got := Score(pkg(), []models.Vulnerability{{Severity: "low"}}, nil)
+	got := Score(pkg(), []models.Vulnerability{{Severity: "low"}}, nil, nil)
 	if got.Recommendation != RecommendationAllow {
 		t.Fatalf("recommendation = %q, want %q", got.Recommendation, RecommendationAllow)
 	}
@@ -50,12 +50,22 @@ func TestScoreLowVulnerabilityAllows(t *testing.T) {
 }
 
 func TestScoreProviderFailureReturnsUnknown(t *testing.T) {
-	got := Score(pkg(), nil, []models.ProviderError{{Provider: "OSV", Message: "timeout"}})
+	got := Score(pkg(), nil, nil, []models.ProviderError{{Provider: "OSV", Message: "timeout"}})
 	if got.Recommendation != RecommendationUnknown {
 		t.Fatalf("recommendation = %q, want %q", got.Recommendation, RecommendationUnknown)
 	}
 	if got.SafeToUse {
 		t.Fatal("SafeToUse = true, want false")
+	}
+}
+
+func TestScoreRecentReleaseSignalReviews(t *testing.T) {
+	got := Score(pkg(), nil, []models.Signal{{Severity: "medium", Score: 30}}, nil)
+	if got.Recommendation != RecommendationReview {
+		t.Fatalf("recommendation = %q, want %q", got.Recommendation, RecommendationReview)
+	}
+	if got.Classification != ClassificationSuspicious {
+		t.Fatalf("classification = %q, want %q", got.Classification, ClassificationSuspicious)
 	}
 }
 

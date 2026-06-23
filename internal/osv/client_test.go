@@ -8,9 +8,10 @@ import (
 
 func TestConvertVulnerabilityUsesDatabaseSeverityAndFixedVersions(t *testing.T) {
 	raw := vulnerability{
-		ID:      "GHSA-test",
-		Summary: "test vuln",
-		Aliases: []string{"CVE-2026-0001"},
+		ID:         "GHSA-test",
+		Summary:    "test vuln",
+		Aliases:    []string{"CVE-2026-0001"},
+		References: []reference{{Type: "ADVISORY", URL: "https://example.com/advisory"}},
 	}
 	raw.DatabaseSpecific.Severity = "HIGH"
 	raw.Affected = []affected{
@@ -41,5 +42,14 @@ func TestConvertVulnerabilityUsesDatabaseSeverityAndFixedVersions(t *testing.T) 
 	}
 	if len(got.AffectedRanges) != 1 {
 		t.Fatalf("AffectedRanges = %#v, want one range", got.AffectedRanges)
+	}
+	if len(got.CVEIDs) != 1 || got.CVEIDs[0] != "CVE-2026-0001" {
+		t.Fatalf("CVEIDs = %#v, want [CVE-2026-0001]", got.CVEIDs)
+	}
+	if len(got.GHSAIDs) != 1 || got.GHSAIDs[0] != "GHSA-test" {
+		t.Fatalf("GHSAIDs = %#v, want [GHSA-test]", got.GHSAIDs)
+	}
+	if got.AdvisoryURL != "https://example.com/advisory" {
+		t.Fatalf("AdvisoryURL = %q, want advisory URL", got.AdvisoryURL)
 	}
 }

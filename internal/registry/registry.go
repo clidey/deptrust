@@ -4,16 +4,19 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/clidey/deptrust/internal/models"
 )
 
 type VersionInfo struct {
-	Ecosystem models.Ecosystem `json:"ecosystem"`
-	Package   string           `json:"package"`
-	Version   string           `json:"version"`
-	Latest    string           `json:"latest_version"`
-	Versions  []string         `json:"versions,omitempty"`
+	Ecosystem            models.Ecosystem      `json:"ecosystem"`
+	Package              string                `json:"package"`
+	Version              string                `json:"version"`
+	Latest               string                `json:"latest_version"`
+	Versions             []string              `json:"versions,omitempty"`
+	PublishedAt          *time.Time            `json:"published_at,omitempty"`
+	PublishedAtByVersion map[string]*time.Time `json:"-"`
 }
 
 type Resolver interface {

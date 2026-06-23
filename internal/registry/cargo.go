@@ -6,14 +6,16 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/clidey/deptrust/internal/models"
 )
 
 type cargoVersionsMetadata struct {
 	Versions []struct {
-		Num    string `json:"num"`
-		Yanked bool   `json:"yanked"`
+		Num       string `json:"num"`
+		Yanked    bool   `json:"yanked"`
+		CreatedAt string `json:"created_at"`
 	} `json:"versions"`
 }
 
@@ -45,12 +47,14 @@ func resolveCargo(ctx context.Context, client HTTPClient, query models.Query) (V
 	versions := make([]string, 0, len(metadata.Versions))
 	latest := ""
 	versionSet := map[string]struct{}{}
+	publishedAtByVersion := map[string]*time.Time{}
 	for _, version := range metadata.Versions {
 		if version.Yanked {
 			continue
 		}
 		versions = append(versions, version.Num)
 		versionSet[version.Num] = struct{}{}
+		publishedAtByVersion[version.Num] = parseTime(version.CreatedAt)
 		if latest == "" {
 			latest = version.Num
 		}
@@ -68,10 +72,12 @@ func resolveCargo(ctx context.Context, client HTTPClient, query models.Query) (V
 	}
 
 	return VersionInfo{
-		Ecosystem: query.Ecosystem,
-		Package:   query.Package,
-		Version:   requested,
-		Latest:    latest,
-		Versions:  versions,
+		Ecosystem:            query.Ecosystem,
+		Package:              query.Package,
+		Version:              requested,
+		Latest:               latest,
+		Versions:             versions,
+		PublishedAt:          publishedAtByVersion[requested],
+		PublishedAtByVersion: publishedAtByVersion,
 	}, nil
 }

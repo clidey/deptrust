@@ -49,6 +49,13 @@ type suggestArgs struct {
 	Package   string `json:"package"`
 }
 
+type compareArgs struct {
+	Ecosystem   string `json:"ecosystem"`
+	Package     string `json:"package"`
+	FromVersion string `json:"from_version"`
+	ToVersion   string `json:"to_version"`
+}
+
 func Serve(ctx context.Context, service app.App, in io.Reader, out io.Writer) error {
 	scanner := bufio.NewScanner(in)
 	scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
@@ -142,6 +149,20 @@ func callTool(ctx context.Context, service app.App, req request) response {
 			return toolError(req.ID, err.Error())
 		}
 		return toolResult(req.ID, result.Summary, result)
+	case "compare_versions":
+		var args compareArgs
+		if err := json.Unmarshal(params.Arguments, &args); err != nil {
+			return toolError(req.ID, "invalid compare_versions arguments")
+		}
+		query, err := app.ParseQuery(args.Ecosystem, args.Package, "")
+		if err != nil {
+			return toolError(req.ID, err.Error())
+		}
+		result, err := service.CompareVersions(ctx, query, args.FromVersion, args.ToVersion)
+		if err != nil {
+			return toolError(req.ID, err.Error())
+		}
+		return toolResult(req.ID, result.Summary, result)
 	default:
 		return toolError(req.ID, fmt.Sprintf("unknown tool %q", params.Name))
 	}
@@ -221,6 +242,33 @@ func tools() []map[string]any {
 			},
 			"outputSchema": map[string]any{"type": "object"},
 		},
+		{
+			"name":        "compare_versions",
+			"description": "Compare two package versions and show whether the target version improves risk.",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"ecosystem": map[string]any{
+						"type":        "string",
+						"description": "Package ecosystem: npm, pypi, or cargo.",
+					},
+					"package": map[string]any{
+						"type":        "string",
+						"description": "Package name.",
+					},
+					"from_version": map[string]any{
+						"type":        "string",
+						"description": "Current exact version.",
+					},
+					"to_version": map[string]any{
+						"type":        "string",
+						"description": "Target exact version.",
+					},
+				},
+				"required": []string{"ecosystem", "package", "from_version", "to_version"},
+			},
+			"outputSchema": map[string]any{"type": "object"},
+		},
 	}
 }
 
@@ -234,10 +282,14 @@ func checkOutputSchema() map[string]any {
 			"latest_version":                map[string]any{"type": "string"},
 			"known_vulnerabilities_found":   map[string]any{"type": "boolean"},
 			"safe_to_use":                   map[string]any{"type": "boolean"},
+			"should_install":                map[string]any{"type": "boolean"},
 			"risk_score":                    map[string]any{"type": "integer"},
 			"classification":                map[string]any{"type": "string"},
 			"recommendation":                map[string]any{"type": "string"},
+			"reason":                        map[string]any{"type": "string"},
+			"next_action":                   map[string]any{"type": "string"},
 			"summary":                       map[string]any{"type": "string"},
+			"signals":                       map[string]any{"type": "array"},
 			"vulnerabilities":               map[string]any{"type": "array"},
 			"provider_errors":               map[string]any{"type": "array"},
 			"resolved_from_version_request": map[string]any{"type": "string"},

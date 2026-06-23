@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/clidey/deptrust/internal/models"
 )
@@ -14,7 +15,9 @@ type pypiMetadata struct {
 	Info struct {
 		Version string `json:"version"`
 	} `json:"info"`
-	Releases map[string][]struct{} `json:"releases"`
+	Releases map[string][]struct {
+		UploadTimeISO8601 string `json:"upload_time_iso_8601"`
+	} `json:"releases"`
 }
 
 func resolvePyPI(ctx context.Context, client HTTPClient, query models.Query) (VersionInfo, error) {
@@ -52,12 +55,29 @@ func resolvePyPI(ctx context.Context, client HTTPClient, query models.Query) (Ve
 	if _, ok := metadata.Releases[requested]; !ok {
 		return VersionInfo{}, VersionNotFoundError{Package: query.Package, Version: requested, Latest: latest}
 	}
+	publishedAtByVersion := map[string]*time.Time{}
+	for version, files := range metadata.Releases {
+		publishedAtByVersion[version] = pypiPublishedAt(files)
+	}
 
 	return VersionInfo{
-		Ecosystem: query.Ecosystem,
-		Package:   query.Package,
-		Version:   requested,
-		Latest:    latest,
-		Versions:  sortedMapKeys(metadata.Releases),
+		Ecosystem:            query.Ecosystem,
+		Package:              query.Package,
+		Version:              requested,
+		Latest:               latest,
+		Versions:             sortedVersionKeys(metadata.Releases),
+		PublishedAt:          publishedAtByVersion[requested],
+		PublishedAtByVersion: publishedAtByVersion,
 	}, nil
+}
+
+func pypiPublishedAt(files []struct {
+	UploadTimeISO8601 string `json:"upload_time_iso_8601"`
+}) *time.Time {
+	for _, file := range files {
+		if parsed := parseTime(file.UploadTimeISO8601); parsed != nil {
+			return parsed
+		}
+	}
+	return nil
 }
