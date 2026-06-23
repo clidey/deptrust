@@ -239,6 +239,40 @@ Checks a package version and returns known vulnerabilities plus a recommendation
 
 `version` may be omitted or set to `latest`. If an exact version does not exist, deptrust returns an error and suggests the latest explicit version.
 
+MCP output is intentionally compact so agents can decide whether to install a dependency without pulling full advisory bodies into context. If the user asks to see full details, the agent can run the `full_response_command`.
+
+Example compact MCP structured output:
+
+```json
+{
+  "ecosystem": "npm",
+  "package": "vite",
+  "version": "7.0.0",
+  "latest_version": "8.0.16",
+  "known_vulnerabilities_found": true,
+  "safe_to_use": false,
+  "should_install": false,
+  "risk_score": 80,
+  "classification": "vulnerable",
+  "recommendation": "block",
+  "reason": "Found 7 known vulnerability records.",
+  "next_action": "do_not_install; use suggest_safe_version or compare_versions to choose a safer version",
+  "summary": "vite 7.0.0 has 7 known vulnerabilities, including high severity. Block this exact version and prefer a fixed release.",
+  "vulnerability_count": 7,
+  "vulnerability_counts": {
+    "critical": 0,
+    "high": 2,
+    "medium": 3,
+    "low": 2,
+    "unknown": 0
+  },
+  "highest_severity": "high",
+  "full_response_command": "deptrust check --json npm vite 7.0.0"
+}
+```
+
+The compact MCP response omits the vulnerability array, advisory `details`, and repeated `references`. Agents should use the counts, highest severity, recommendation, and next action by default. If the user asks for full advisory details, run the `full_response_command`.
+
 ### `suggest_safe_version`
 
 Checks the latest version first. If latest is not allowed, checks older known versions and suggests the newest version with an `allow` recommendation.

@@ -9,7 +9,6 @@ import (
 
 	"github.com/clidey/deptrust/internal/app"
 	"github.com/clidey/deptrust/internal/buildinfo"
-	"github.com/clidey/deptrust/internal/models"
 )
 
 const protocolVersion = "2025-11-25"
@@ -134,7 +133,8 @@ func callTool(ctx context.Context, service app.App, req request) response {
 		if err != nil {
 			return toolError(req.ID, err.Error())
 		}
-		return toolResult(req.ID, result.Summary, result)
+		compact := compactCheck(result)
+		return toolResult(req.ID, compactToolText(result.Summary, compact.FullResponseCommand), compact)
 	case "suggest_safe_version":
 		var args suggestArgs
 		if err := json.Unmarshal(params.Arguments, &args); err != nil {
@@ -148,7 +148,8 @@ func callTool(ctx context.Context, service app.App, req request) response {
 		if err != nil {
 			return toolError(req.ID, err.Error())
 		}
-		return toolResult(req.ID, result.Summary, result)
+		compact := compactSuggest(result)
+		return toolResult(req.ID, compactToolText(result.Summary, compact.FullResponseCommand), compact)
 	case "compare_versions":
 		var args compareArgs
 		if err := json.Unmarshal(params.Arguments, &args); err != nil {
@@ -162,7 +163,8 @@ func callTool(ctx context.Context, service app.App, req request) response {
 		if err != nil {
 			return toolError(req.ID, err.Error())
 		}
-		return toolResult(req.ID, result.Summary, result)
+		compact := compactCompare(result)
+		return toolResult(req.ID, compactToolText(result.Summary, compact.FullResponseCommand), compact)
 	default:
 		return toolError(req.ID, fmt.Sprintf("unknown tool %q", params.Name))
 	}
@@ -179,6 +181,13 @@ func toolResult(id json.RawMessage, summary string, structured any) response {
 			"structuredContent": structured,
 		},
 	}
+}
+
+func compactToolText(summary, fullResponseCommand string) string {
+	if fullResponseCommand == "" {
+		return summary
+	}
+	return summary + "\n\nMCP returns a compact safety result by default. If the user asks to see full advisory details, run: " + fullResponseCommand
 }
 
 func toolError(id json.RawMessage, message string) response {
@@ -289,12 +298,13 @@ func checkOutputSchema() map[string]any {
 			"reason":                        map[string]any{"type": "string"},
 			"next_action":                   map[string]any{"type": "string"},
 			"summary":                       map[string]any{"type": "string"},
+			"vulnerability_count":           map[string]any{"type": "integer"},
+			"vulnerability_counts":          map[string]any{"type": "object"},
+			"highest_severity":              map[string]any{"type": "string"},
 			"signals":                       map[string]any{"type": "array"},
-			"vulnerabilities":               map[string]any{"type": "array"},
 			"provider_errors":               map[string]any{"type": "array"},
 			"resolved_from_version_request": map[string]any{"type": "string"},
+			"full_response_command":         map[string]any{"type": "string"},
 		},
 	}
 }
-
-var _ = models.CheckResult{}
