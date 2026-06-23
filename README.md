@@ -9,7 +9,7 @@
            /_/
 ```
 
-deptrust is a CLI that checks package versions for known vulnerabilities across npm, PyPI, crates.io, and more.
+deptrust is a CLI that checks package versions for known vulnerabilities across npm, PyPI, crates.io, Go modules, RubyGems, NuGet, Maven, and more.
 
 It runs locally as a CLI and as an MCP server. It calls public package registry and OSV APIs directly; there is no hosted deptrust service to trust or configure.
 
@@ -33,6 +33,10 @@ Supported ecosystems:
 - npm, including scoped packages like `@clidey/ux`
 - PyPI
 - Cargo / crates.io
+- Go modules
+- RubyGems
+- NuGet
+- Maven, using `groupId:artifactId` package names
 
 deptrust currently reports known vulnerabilities and gives a simple recommendation:
 
@@ -79,6 +83,20 @@ Return JSON:
 
 ```bash
 deptrust check --json cargo serde latest
+```
+
+Check a Go module:
+
+```bash
+deptrust check go golang.org/x/crypto latest
+```
+
+Check RubyGems, NuGet, or Maven:
+
+```bash
+deptrust check rubygems rails latest
+deptrust check nuget Newtonsoft.Json latest
+deptrust check maven org.apache.logging.log4j:log4j-core latest
 ```
 
 Example JSON response:
@@ -315,7 +333,7 @@ If you do not want MCP, install the bundled Codex skill:
 npx @clidey/deptrust skills install
 ```
 
-The skill tells Codex to call the `deptrust` CLI before installing, updating, or recommending npm, PyPI, and Cargo packages.
+The skill tells Codex to call the `deptrust` CLI before installing, updating, or recommending npm, PyPI, Cargo, Go module, RubyGems, NuGet, and Maven packages.
 
 ## Troubleshooting
 

@@ -43,6 +43,14 @@ func (r resolver) Resolve(ctx context.Context, query models.Query) (VersionInfo,
 		return resolvePyPI(ctx, r.client, query)
 	case models.EcosystemCargo:
 		return resolveCargo(ctx, r.client, query)
+	case models.EcosystemGo:
+		return resolveGo(ctx, r.client, query)
+	case models.EcosystemRuby:
+		return resolveRubyGems(ctx, r.client, query)
+	case models.EcosystemNuGet:
+		return resolveNuGet(ctx, r.client, query)
+	case models.EcosystemMaven:
+		return resolveMaven(ctx, r.client, query)
 	default:
 		return VersionInfo{}, fmt.Errorf("unsupported ecosystem %q", query.Ecosystem)
 	}

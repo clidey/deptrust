@@ -1,6 +1,6 @@
 ---
 name: deptrust-package-check
-description: Check package safety with the local deptrust CLI before installing, updating, or recommending npm, PyPI, or Cargo dependencies. Use when asked to add, upgrade, audit, or evaluate a package version and MCP is unavailable or not configured.
+description: Check package safety with the local deptrust CLI before installing, updating, or recommending npm, PyPI, Cargo, Go module, RubyGems, NuGet, or Maven dependencies. Use when asked to add, upgrade, audit, or evaluate a package version and MCP is unavailable or not configured.
 version: "0.3.0"
 ---
 
@@ -27,6 +27,10 @@ Use:
 - `npm` for npm packages, including scoped names like `@scope/name`
 - `pypi` for Python packages
 - `cargo` for Rust crates
+- `go` for Go modules, such as `golang.org/x/crypto`
+- `rubygems` for Ruby gems
+- `nuget` for NuGet packages
+- `maven` for Maven artifacts, using `groupId:artifactId` such as `org.apache.logging.log4j:log4j-core`
 
 3. Interpret the JSON:
    - `recommendation: "block"` means do not install that exact version.

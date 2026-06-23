@@ -217,7 +217,7 @@ func tools() []map[string]any {
 				"properties": map[string]any{
 					"ecosystem": map[string]any{
 						"type":        "string",
-						"description": "Package ecosystem: npm, pypi, or cargo.",
+						"description": "Package ecosystem: npm, pypi, cargo, go, rubygems, nuget, or maven.",
 					},
 					"package": map[string]any{
 						"type":        "string",
@@ -240,7 +240,7 @@ func tools() []map[string]any {
 				"properties": map[string]any{
 					"ecosystem": map[string]any{
 						"type":        "string",
-						"description": "Package ecosystem: npm, pypi, or cargo.",
+						"description": "Package ecosystem: npm, pypi, cargo, go, rubygems, nuget, or maven.",
 					},
 					"package": map[string]any{
 						"type":        "string",
@@ -259,7 +259,7 @@ func tools() []map[string]any {
 				"properties": map[string]any{
 					"ecosystem": map[string]any{
 						"type":        "string",
-						"description": "Package ecosystem: npm, pypi, or cargo.",
+						"description": "Package ecosystem: npm, pypi, cargo, go, rubygems, nuget, or maven.",
 					},
 					"package": map[string]any{
 						"type":        "string",

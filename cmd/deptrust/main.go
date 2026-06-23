@@ -165,9 +165,13 @@ Examples:
   deptrust check npm lodash 4.17.20
   deptrust check --json pypi requests latest
   deptrust suggest cargo serde
+  deptrust check go golang.org/x/crypto latest
+  deptrust check rubygems rails latest
+  deptrust check nuget Newtonsoft.Json latest
+  deptrust check maven org.apache.logging.log4j:log4j-core latest
   deptrust compare npm lodash 4.17.20 4.17.21
 
-Supported ecosystems: npm, pypi, cargo
+Supported ecosystems: npm, pypi, cargo, go, rubygems, nuget, maven
 `))
 }
 

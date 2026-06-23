@@ -14,6 +14,10 @@ const (
 	EcosystemNPM   Ecosystem = "npm"
 	EcosystemPyPI  Ecosystem = "pypi"
 	EcosystemCargo Ecosystem = "cargo"
+	EcosystemGo    Ecosystem = "go"
+	EcosystemRuby  Ecosystem = "rubygems"
+	EcosystemNuGet Ecosystem = "nuget"
+	EcosystemMaven Ecosystem = "maven"
 )
 
 func NormalizeEcosystem(value string) (Ecosystem, error) {
@@ -24,8 +28,16 @@ func NormalizeEcosystem(value string) (Ecosystem, error) {
 		return EcosystemPyPI, nil
 	case "cargo", "crate", "crates", "crates.io", "rust":
 		return EcosystemCargo, nil
+	case "go", "golang", "gomod", "go module", "go modules":
+		return EcosystemGo, nil
+	case "ruby", "gem", "gems", "rubygem", "rubygems":
+		return EcosystemRuby, nil
+	case "nuget", ".net", "dotnet":
+		return EcosystemNuGet, nil
+	case "maven", "java", "jvm":
+		return EcosystemMaven, nil
 	default:
-		return "", fmt.Errorf("unsupported ecosystem %q; supported ecosystems: npm, pypi, cargo", value)
+		return "", fmt.Errorf("unsupported ecosystem %q; supported ecosystems: npm, pypi, cargo, go, rubygems, nuget, maven", value)
 	}
 }
 
@@ -37,6 +49,14 @@ func (e Ecosystem) OSVEcosystem() string {
 		return "PyPI"
 	case EcosystemCargo:
 		return "crates.io"
+	case EcosystemGo:
+		return "Go"
+	case EcosystemRuby:
+		return "RubyGems"
+	case EcosystemNuGet:
+		return "NuGet"
+	case EcosystemMaven:
+		return "Maven"
 	default:
 		return string(e)
 	}
@@ -50,6 +70,14 @@ func (e Ecosystem) GitHubEcosystem() string {
 		return "pip"
 	case EcosystemCargo:
 		return "rust"
+	case EcosystemGo:
+		return "go"
+	case EcosystemRuby:
+		return "rubygems"
+	case EcosystemNuGet:
+		return "nuget"
+	case EcosystemMaven:
+		return "maven"
 	default:
 		return string(e)
 	}
