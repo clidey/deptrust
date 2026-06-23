@@ -1,7 +1,7 @@
 ---
 name: deptrust-package-check
 description: Check package safety with the local deptrust CLI before installing, updating, or recommending npm, PyPI, or Cargo dependencies. Use when asked to add, upgrade, audit, or evaluate a package version and MCP is unavailable or not configured.
-version: "0.1.0"
+version: "0.2.0"
 ---
 
 # deptrust Package Check
