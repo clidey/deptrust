@@ -84,9 +84,6 @@ jobs:
       - name: Build release archives
         run: ./scripts/build-release.sh "${{ steps.release.outputs.tag }}" "${GITHUB_SHA::7}" "${{ steps.release.outputs.date }}"
 
-      - name: Generate Homebrew formula
-        run: ./scripts/generate-homebrew-formula.sh "${{ steps.release.outputs.tag }}" dist dist/deptrust.rb
-
       - name: Generate release notes
         run: ./scripts/release-notes.sh "${{ steps.release.outputs.tag }}" dist/release-notes.md
 
