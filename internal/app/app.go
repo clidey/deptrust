@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/clidey/deptrust/internal/github"
 	"github.com/clidey/deptrust/internal/models"
 	"github.com/clidey/deptrust/internal/osv"
 	"github.com/clidey/deptrust/internal/registry"
@@ -16,12 +18,13 @@ import (
 )
 
 type App struct {
-	registry registry.Resolver
-	osv      vulnerabilityClient
-	now      func() time.Time
+	registry  registry.Resolver
+	providers []vulnerabilityClient
+	now       func() time.Time
 }
 
 type vulnerabilityClient interface {
+	Name() string
 	Query(ctx context.Context, pkg models.PackageVersion) ([]models.Vulnerability, error)
 }
 
@@ -29,8 +32,11 @@ func New() App {
 	client := &http.Client{Timeout: 15 * time.Second}
 	return App{
 		registry: registry.New(client),
-		osv:      osv.New(client),
-		now:      time.Now,
+		providers: []vulnerabilityClient{
+			osv.New(client),
+			github.New(client),
+		},
+		now: time.Now,
 	}
 }
 
@@ -187,11 +193,39 @@ func (a App) CompareVersions(ctx context.Context, query models.Query, fromVersio
 }
 
 func (a App) queryVulnerabilities(ctx context.Context, pkg models.PackageVersion) ([]models.Vulnerability, []models.ProviderError) {
-	vulns, err := a.osv.Query(ctx, pkg)
-	if err == nil {
-		return dedupeVulnerabilities(vulns), nil
+	if len(a.providers) == 0 {
+		return nil, nil
 	}
-	return nil, []models.ProviderError{{Provider: "OSV", Message: err.Error()}}
+
+	type providerResult struct {
+		provider string
+		vulns    []models.Vulnerability
+		err      error
+	}
+
+	results := make(chan providerResult, len(a.providers))
+	var wg sync.WaitGroup
+	for _, provider := range a.providers {
+		wg.Add(1)
+		go func(provider vulnerabilityClient) {
+			defer wg.Done()
+			vulns, err := provider.Query(ctx, pkg)
+			results <- providerResult{provider: provider.Name(), vulns: vulns, err: err}
+		}(provider)
+	}
+	wg.Wait()
+	close(results)
+
+	var vulns []models.Vulnerability
+	var providerErrors []models.ProviderError
+	for result := range results {
+		if result.err != nil {
+			providerErrors = append(providerErrors, models.ProviderError{Provider: result.provider, Message: result.err.Error()})
+			continue
+		}
+		vulns = append(vulns, result.vulns...)
+	}
+	return dedupeVulnerabilities(vulns), providerErrors
 }
 
 func (a App) signals(pkg models.PackageVersion) []models.Signal {
@@ -241,10 +275,7 @@ func dedupeVulnerabilities(vulns []models.Vulnerability) []models.Vulnerability 
 	seen := map[string]struct{}{}
 	out := make([]models.Vulnerability, 0, len(vulns))
 	for _, vuln := range vulns {
-		key := vuln.ID
-		if key == "" {
-			key = vuln.Summary
-		}
+		key := vulnerabilityDedupeKey(vuln)
 		if _, ok := seen[key]; ok {
 			continue
 		}
@@ -252,6 +283,29 @@ func dedupeVulnerabilities(vulns []models.Vulnerability) []models.Vulnerability 
 		out = append(out, vuln)
 	}
 	return out
+}
+
+func vulnerabilityDedupeKey(vuln models.Vulnerability) string {
+	for _, id := range vuln.GHSAIDs {
+		if id != "" {
+			return strings.ToUpper(id)
+		}
+	}
+	for _, id := range vuln.CVEIDs {
+		if id != "" {
+			return strings.ToUpper(id)
+		}
+	}
+	for _, alias := range vuln.Aliases {
+		upper := strings.ToUpper(alias)
+		if strings.HasPrefix(upper, "GHSA-") || strings.HasPrefix(upper, "CVE-") {
+			return upper
+		}
+	}
+	if vuln.ID != "" {
+		return strings.ToUpper(vuln.ID)
+	}
+	return vuln.Summary
 }
 
 func appendProviderErrors(left, right []models.ProviderError) []models.ProviderError {

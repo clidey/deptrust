@@ -202,7 +202,7 @@ func tools() []map[string]any {
 	return []map[string]any{
 		{
 			"name":        "check_package",
-			"description": "Check whether a package version has known vulnerabilities and return an install recommendation.",
+			"description": "Check whether a package version has known vulnerabilities across OSV and GitHub advisories and return an install recommendation.",
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -225,7 +225,7 @@ func tools() []map[string]any {
 		},
 		{
 			"name":        "suggest_safe_version",
-			"description": "Check the latest package version and suggest it only if no known vulnerabilities are found.",
+			"description": "Check package versions across OSV and GitHub advisories and suggest the newest version with an allow recommendation.",
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{

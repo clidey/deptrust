@@ -43,9 +43,17 @@ func (f fakeRegistry) Resolve(_ context.Context, query models.Query) (registry.V
 
 type fakeOSV struct {
 	vulns map[string][]models.Vulnerability
+	err   error
+}
+
+func (f fakeOSV) Name() string {
+	return "fake"
 }
 
 func (f fakeOSV) Query(_ context.Context, pkg models.PackageVersion) ([]models.Vulnerability, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
 	if f.vulns == nil {
 		return nil, nil
 	}
@@ -55,9 +63,11 @@ func (f fakeOSV) Query(_ context.Context, pkg models.PackageVersion) ([]models.V
 func TestSuggestSafeVersionWalksBackFromVulnerableLatest(t *testing.T) {
 	service := App{
 		registry: fakeRegistry{versions: []string{"3.0.0", "2.0.0", "1.0.0"}},
-		osv: fakeOSV{vulns: map[string][]models.Vulnerability{
-			"3.0.0": {{ID: "GHSA-new", Severity: "high", Source: "OSV"}},
-		}},
+		providers: []vulnerabilityClient{
+			fakeOSV{vulns: map[string][]models.Vulnerability{
+				"3.0.0": {{ID: "GHSA-new", Severity: "high", Source: "OSV"}},
+			}},
+		},
 		now: time.Now,
 	}
 
@@ -80,7 +90,7 @@ func TestCheckPackageAddsRecentReleaseSignal(t *testing.T) {
 			versions:  []string{"1.0.0"},
 			published: map[string]*time.Time{"1.0.0": &published},
 		},
-		osv: fakeOSV{},
+		providers: []vulnerabilityClient{fakeOSV{}},
 		now: func() time.Time {
 			return published.Add(24 * time.Hour)
 		},
@@ -101,9 +111,11 @@ func TestCheckPackageAddsRecentReleaseSignal(t *testing.T) {
 func TestCompareVersionsReportsResolvedVulnerabilities(t *testing.T) {
 	service := App{
 		registry: fakeRegistry{versions: []string{"2.0.0", "1.0.0"}},
-		osv: fakeOSV{vulns: map[string][]models.Vulnerability{
-			"1.0.0": {{ID: "GHSA-old", Severity: "high", Source: "OSV"}},
-		}},
+		providers: []vulnerabilityClient{
+			fakeOSV{vulns: map[string][]models.Vulnerability{
+				"1.0.0": {{ID: "GHSA-old", Severity: "high", Source: "OSV"}},
+			}},
+		},
 		now: time.Now,
 	}
 
@@ -124,5 +136,28 @@ func TestCompareVersionsRequiresBothVersions(t *testing.T) {
 	_, err := service.CompareVersions(context.Background(), models.Query{Ecosystem: models.EcosystemNPM, Package: "pkg"}, "", "2.0.0")
 	if err == nil || err.Error() != "compare requires from and to versions" {
 		t.Fatal("expected compare version error")
+	}
+}
+
+func TestCheckPackageQueriesProvidersAndDedupes(t *testing.T) {
+	service := App{
+		registry: fakeRegistry{versions: []string{"1.0.0"}},
+		providers: []vulnerabilityClient{
+			fakeOSV{vulns: map[string][]models.Vulnerability{
+				"1.0.0": {{ID: "OSV-1", GHSAIDs: []string{"GHSA-same"}, Severity: "high", Source: "OSV"}},
+			}},
+			fakeOSV{vulns: map[string][]models.Vulnerability{
+				"1.0.0": {{ID: "GHSA-same", GHSAIDs: []string{"GHSA-same"}, Severity: "high", Source: "GitHub Advisory DB"}},
+			}},
+		},
+		now: time.Now,
+	}
+
+	result, err := service.CheckPackage(context.Background(), models.Query{Ecosystem: models.EcosystemNPM, Package: "pkg", Version: "1.0.0"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Vulnerabilities) != 1 {
+		t.Fatalf("Vulnerabilities = %#v, want one deduped advisory", result.Vulnerabilities)
 	}
 }

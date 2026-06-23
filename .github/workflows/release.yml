@@ -110,7 +110,6 @@ jobs:
             dist/*.tar.gz
             dist/*.zip
             dist/checksums.txt
-            dist/deptrust.rb
             dist/release-notes.md
 
       - name: Publish npm package

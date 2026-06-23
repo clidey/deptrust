@@ -22,8 +22,7 @@ else
 fi
 
 {
-  printf '# deptrust %s\n\n' "$tag"
-  printf '## %s\n\n' "$heading"
+  printf "$heading"
   git log --no-merges --pretty=format:'- %s (%h)' "$range"
   printf '\n'
 } > "$out"

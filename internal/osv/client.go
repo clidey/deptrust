@@ -29,6 +29,10 @@ func New(client HTTPClient) Client {
 	}
 }
 
+func (c Client) Name() string {
+	return "OSV"
+}
+
 type queryRequest struct {
 	Version string       `json:"version"`
 	Package queryPackage `json:"package"`

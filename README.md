@@ -39,6 +39,11 @@ deptrust currently reports known vulnerabilities and gives a simple recommendati
 
 deptrust also emits risk signals that are not CVEs. For example, a version published in the last 72 hours is marked for review so an agent does not blindly install a brand-new release.
 
+Advisory providers are queried in parallel:
+
+- OSV
+- GitHub Advisory Database, including reviewed advisories and malware advisories
+
 ## CLI Usage
 
 Check an exact version:
