@@ -6,6 +6,17 @@ It runs locally as a CLI and as an MCP server. It calls public package registry 
 
 This tool was born out of the frustration that is AI agents constantly using old versions.
 
+## Contents
+
+- [Scope](#scope)
+- [CLI Usage](#cli-usage)
+- [Install](#install)
+- [Agent Setup](#agent-setup)
+- [Manual MCP Setup](#manual-mcp-setup)
+- [MCP Tools](#mcp-tools)
+- [Skill-Only Use](#skill-only-use)
+- [Troubleshooting](#troubleshooting)
+
 ## Scope
 
 Supported ecosystems:
@@ -26,26 +37,20 @@ deptrust currently reports known vulnerabilities and gives a simple recommendati
 
 `allow` means no blocking known vulnerability was found in the public data sources. It does not prove that a package is safe.
 
-## Install
-
-The easiest install path is `npx` or `pnpx`:
-
-```bash
-pnpx @clidey/deptrust install --check
-```
-
-Go users can install directly:
-
-```bash
-go install github.com/clidey/deptrust/cmd/deptrust@latest
-```
-
 ## CLI Usage
 
 Check an exact version:
 
 ```bash
 deptrust check npm lodash 4.17.20
+```
+
+Example normal response:
+
+```text
+npm lodash@4.17.20: 2 known vulnerabilities found
+recommendation: block
+risk_score: 80
 ```
 
 Check the latest version:
@@ -60,6 +65,34 @@ Return JSON:
 deptrust check --json cargo serde latest
 ```
 
+Example JSON response:
+
+```json
+{
+  "package": {
+    "ecosystem": "npm",
+    "name": "lodash",
+    "version": "4.17.20"
+  },
+  "risk_score": 80,
+  "recommendation": "block",
+  "classification": "compromised",
+  "summary": "npm lodash@4.17.20: 2 known vulnerabilities found",
+  "vulnerabilities": [
+    {
+      "id": "GHSA-35jh-r3h4-6jhm",
+      "summary": "Command Injection in lodash",
+      "severity": "high",
+      "source": "OSV",
+      "aliases": [
+        "CVE-2021-23337"
+      ]
+    }
+  ],
+  "provider_errors": []
+}
+```
+
 Suggest the latest version only when no known vulnerabilities are found:
 
 ```bash
@@ -70,6 +103,20 @@ Show the installed version:
 
 ```bash
 deptrust version
+```
+
+## Install
+
+The easiest install path is `npx` or `pnpx`:
+
+```bash
+pnpx @clidey/deptrust install --check
+```
+
+Go users can install directly:
+
+```bash
+go install github.com/clidey/deptrust/cmd/deptrust@latest
 ```
 
 ## Agent Setup
