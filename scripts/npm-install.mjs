@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 
-import { createWriteStream, existsSync, mkdirSync, chmodSync, copyFileSync, rmSync, cpSync } from "node:fs";
+import { createWriteStream, existsSync, mkdirSync, chmodSync, copyFileSync, rmSync, cpSync, accessSync, constants } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { tmpdir, homedir } from "node:os";
 import { randomBytes } from "node:crypto";
+import { createInterface } from "node:readline/promises";
 import https from "node:https";
 
 const repo = "clidey/deptrust";
@@ -26,6 +27,8 @@ async function main() {
   const command = args[0];
   if (command === "install") {
     const options = parseOptions(args.slice(1));
+    await maybePromptInstallOptions(options);
+    await confirmInstallPlan(options);
     const installPath = await installBinary(options);
     await maybeInstallSkill(options);
     maybeRegisterMCP(options, installPath);
@@ -33,9 +36,18 @@ async function main() {
     return;
   }
 
+  if (command === "uninstall") {
+    const options = parseOptions(args.slice(1));
+    applyDefaultUninstallSelection(options);
+    await confirmUninstallPlan(options);
+    uninstall(options);
+    return;
+  }
+
   if (command === "skills" && args[1] === "install") {
     const options = parseOptions(args.slice(2));
     options.codexSkill = true;
+    await confirmInstallPlan(options);
     const installPath = await installBinary(options);
     await maybeInstallSkill(options);
     printNextSteps(installPath);
@@ -48,6 +60,7 @@ async function main() {
       options.codexMCP = true;
       options.claudeCodeMCP = true;
     }
+    await confirmInstallPlan(options);
     const installPath = await installBinary(options);
     maybeRegisterMCP(options, installPath);
     printNextSteps(installPath);
@@ -65,6 +78,8 @@ function parseOptions(args) {
     codexSkill: false,
     claudeCodeMCP: false,
     check: false,
+    yes: false,
+    guided: false,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -93,11 +108,16 @@ function parseOptions(args) {
       case "--check":
         options.check = true;
         break;
+      case "-y":
+      case "--yes":
+        options.yes = true;
+        break;
       default:
         throw new Error(`unknown option: ${arg}`);
     }
   }
 
+  options.guided = !options.yes && !options.codexMCP && !options.codexSkill && !options.claudeCodeMCP;
   return options;
 }
 
@@ -108,8 +128,17 @@ function requiredValue(args, index, flag) {
   return args[index];
 }
 
+function applyDefaultUninstallSelection(options) {
+  if (options.codexMCP || options.codexSkill || options.claudeCodeMCP) {
+    return;
+  }
+  options.codexMCP = true;
+  options.codexSkill = true;
+  options.claudeCodeMCP = true;
+}
+
 async function installBinary(options) {
-  const version = options.version === "latest" ? await latestVersion() : normalizeVersion(options.version);
+  const version = options.version === "latest" ? await withSpinner("Resolving latest deptrust release", latestVersion) : normalizeVersion(options.version);
   const target = platformTarget();
   const archiveName = `deptrust_${version}_${target.goos}_${target.goarch}.${target.extension}`;
   const url = `https://github.com/${repo}/releases/download/${version}/${archiveName}`;
@@ -123,7 +152,8 @@ async function installBinary(options) {
   mkdirSync(options.binDir, { recursive: true });
 
   console.log(`Downloading ${url}`);
-  await download(url, archivePath);
+  await withSpinner(`Downloading ${archiveName}`, () => download(url, archivePath));
+  console.log(`Extracting ${archiveName}`);
   run("tar", ["-xf", archivePath, "-C", extractDir]);
 
   const source = join(extractDir, archiveName.replace(`.${target.extension}`, ""), binaryName);
@@ -141,6 +171,178 @@ async function installBinary(options) {
   rmSync(workDir, { recursive: true, force: true });
   console.log(`Installed deptrust to ${installPath}`);
   return installPath;
+}
+
+async function confirmInstallPlan(options) {
+  printInstallPlan(options);
+  if (options.yes) {
+    return;
+  }
+  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+    console.log("Non-interactive shell detected; continuing without confirmation. Pass --yes to skip this message.");
+    return;
+  }
+
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const answer = await rl.question("Continue? [y/N] ");
+    if (!["y", "yes"].includes(answer.trim().toLowerCase())) {
+      throw new Error("installation cancelled");
+    }
+  } finally {
+    rl.close();
+  }
+}
+
+async function maybePromptInstallOptions(options) {
+  if (!options.guided) {
+    return;
+  }
+  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+    console.log("Non-interactive shell detected; installing binary only. Pass --all or specific integration flags to configure agents.");
+    return;
+  }
+
+  console.log("deptrust guided install");
+  console.log("  This installer does not modify files in the current project.");
+  console.log("  It installs the deptrust binary first, then can configure optional user-level agent integrations.");
+  console.log("  Choose optional agent integrations:");
+  console.log("");
+
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    options.codexMCP = await confirm(rl, "Register Codex MCP server?", true);
+    options.claudeCodeMCP = await confirm(rl, "Register Claude Code MCP server?", true);
+    options.codexSkill = await confirm(rl, "Install Codex skill fallback?", true);
+  } finally {
+    rl.close();
+  }
+  console.log("");
+}
+
+async function confirm(rl, question, defaultValue) {
+  const suffix = defaultValue ? "[Y/n]" : "[y/N]";
+  const answer = (await rl.question(`${question} ${suffix} `)).trim().toLowerCase();
+  if (answer === "") {
+    return defaultValue;
+  }
+  return ["y", "yes"].includes(answer);
+}
+
+function printInstallPlan(options) {
+  const binaryName = process.platform === "win32" ? "deptrust.exe" : "deptrust";
+  const installPath = join(options.binDir, binaryName);
+  console.log("deptrust will install/update user-level files:");
+  console.log(`  Binary: ${installPath}`);
+  if (options.codexSkill) {
+    console.log(`  Codex skill: ${join(homedir(), ".agents", "skills", "deptrust-package-check")}`);
+  }
+  if (options.codexMCP) {
+    console.log(`  Codex MCP: user/global Codex config -> ${installPath} mcp`);
+  }
+  if (options.claudeCodeMCP) {
+    console.log(`  Claude Code MCP: user config -> ${installPath} mcp`);
+  }
+  console.log("");
+}
+
+async function confirmUninstallPlan(options) {
+  printUninstallPlan(options);
+  if (options.yes) {
+    return;
+  }
+  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+    console.log("Non-interactive shell detected; continuing without confirmation. Pass --yes to skip this message.");
+    return;
+  }
+
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const answer = await rl.question("Remove these deptrust files/settings? [y/N] ");
+    if (!["y", "yes"].includes(answer.trim().toLowerCase())) {
+      throw new Error("uninstall cancelled");
+    }
+  } finally {
+    rl.close();
+  }
+}
+
+function printUninstallPlan(options) {
+  const binaryName = process.platform === "win32" ? "deptrust.exe" : "deptrust";
+  const installPath = join(options.binDir, binaryName);
+  console.log("deptrust will remove user-level files/settings:");
+  console.log(`  Binary: ${installPath}`);
+  if (options.codexSkill) {
+    console.log(`  Codex skill: ${join(homedir(), ".agents", "skills", "deptrust-package-check")}`);
+  }
+  if (options.codexMCP) {
+    console.log("  Codex MCP: deptrust entry from user/global Codex config");
+  }
+  if (options.claudeCodeMCP) {
+    console.log("  Claude Code MCP: deptrust entry from user config");
+  }
+  console.log("  Current project files: none");
+  console.log("");
+}
+
+function uninstall(options) {
+  const binaryName = process.platform === "win32" ? "deptrust.exe" : "deptrust";
+  const installPath = join(options.binDir, binaryName);
+
+  rmSync(installPath, { force: true });
+  console.log(`Removed deptrust binary from ${installPath}`);
+
+  if (options.codexSkill) {
+    const skillPath = join(homedir(), ".agents", "skills", "deptrust-package-check");
+    rmSync(skillPath, { recursive: true, force: true });
+    console.log(`Removed deptrust-package-check skill from ${skillPath}`);
+  }
+
+  if (options.codexMCP) {
+    if (commandExists("codex")) {
+      runAllowFailure("codex", ["mcp", "remove", "deptrust"]);
+      console.log("Removed deptrust MCP server from Codex if it existed");
+    } else {
+      console.warn("codex command not found; skipping Codex MCP removal");
+    }
+  }
+
+  if (options.claudeCodeMCP) {
+    if (commandExists("claude")) {
+      runAllowFailure("claude", ["mcp", "remove", "deptrust", "--scope", "user"]);
+      console.log("Removed deptrust MCP server from Claude Code if it existed");
+    } else {
+      console.warn("claude command not found; skipping Claude Code MCP removal");
+    }
+  }
+
+  console.log("Uninstalled deptrust user-level setup.");
+}
+
+async function withSpinner(label, task) {
+  if (!process.stderr.isTTY) {
+    console.error(`${label}...`);
+    return task();
+  }
+
+  const frames = ["-", "\\", "|", "/"];
+  let index = 0;
+  process.stderr.write(`${frames[index]} ${label}`);
+  const timer = setInterval(() => {
+    index = (index + 1) % frames.length;
+    process.stderr.write(`\r${frames[index]} ${label}`);
+  }, 100);
+
+  try {
+    const result = await task();
+    clearInterval(timer);
+    process.stderr.write(`\r[done] ${label}\n`);
+    return result;
+  } catch (error) {
+    clearInterval(timer);
+    process.stderr.write(`\r[failed] ${label}\n`);
+    throw error;
+  }
 }
 
 async function latestVersion() {
@@ -213,10 +415,24 @@ function maybeRegisterMCP(options, installPath) {
 }
 
 function commandExists(command) {
-  const check = process.platform === "win32" ? "where" : "command";
-  const args = process.platform === "win32" ? [command] : ["-v", command];
-  const result = spawnSync(check, args, { stdio: "ignore", shell: process.platform !== "win32" });
-  return result.status === 0;
+  const extensions = process.platform === "win32"
+    ? (process.env.PATHEXT || ".EXE;.CMD;.BAT;.COM").split(";")
+    : [""];
+  for (const dir of (process.env.PATH || "").split(process.platform === "win32" ? ";" : ":")) {
+    if (!dir) {
+      continue;
+    }
+    for (const extension of extensions) {
+      const candidate = join(dir, process.platform === "win32" && !command.toLowerCase().endsWith(extension.toLowerCase()) ? `${command}${extension}` : command);
+      try {
+        accessSync(candidate, constants.X_OK);
+        return true;
+      } catch {
+        // Keep searching PATH.
+      }
+    }
+  }
+  return false;
 }
 
 function run(command, args) {
@@ -226,20 +442,28 @@ function run(command, args) {
   }
 }
 
+function runAllowFailure(command, args) {
+  spawnSync(command, args, { stdio: "inherit" });
+}
+
 function download(url, destination) {
   return new Promise((resolvePromise, rejectPromise) => {
     const file = createWriteStream(destination);
     https.get(url, requestHeaders(), (response) => {
       if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
-        file.close();
-        rmSync(destination, { force: true });
-        download(response.headers.location, destination).then(resolvePromise, rejectPromise);
+        response.resume();
+        file.close(() => {
+          rmSync(destination, { force: true });
+          download(response.headers.location, destination).then(resolvePromise, rejectPromise);
+        });
         return;
       }
       if (response.statusCode !== 200) {
-        file.close();
-        rmSync(destination, { force: true });
-        rejectPromise(new Error(`download failed with HTTP ${response.statusCode}`));
+        response.resume();
+        file.close(() => {
+          rmSync(destination, { force: true });
+          rejectPromise(new Error(`download failed with HTTP ${response.statusCode}`));
+        });
         return;
       }
       response.pipe(file);
@@ -304,6 +528,7 @@ deptrust npm installer
 
 Usage:
   npx @clidey/deptrust install [options]
+  npx @clidey/deptrust uninstall [options]
   npx @clidey/deptrust skills install [options]
   npx @clidey/deptrust mcp install [options]
 
@@ -314,11 +539,16 @@ Options:
   --codex-skill           Install Codex skill fallback
   --claude-code-mcp       Register Claude Code MCP
   --all                   Install binary, Codex MCP, Codex skill, and Claude Code MCP
+                          For uninstall, remove Codex MCP, Codex skill, and Claude Code MCP
   --check                 Verify the binary exists after install
+  -y, --yes               Skip interactive confirmation
 
 Examples:
   npx @clidey/deptrust install
+  npx @clidey/deptrust install --yes
   npx @clidey/deptrust install --all
+  npx @clidey/deptrust uninstall
+  npx @clidey/deptrust uninstall --yes
   npx @clidey/deptrust skills install
   npx @clidey/deptrust mcp install --codex-mcp
 `);

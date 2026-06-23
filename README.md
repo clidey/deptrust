@@ -240,8 +240,17 @@ deptrust version
 The easiest install path is `npx` or `pnpx`:
 
 ```bash
-npx @clidey/deptrust install --check
-pnpx @clidey/deptrust@latest install --check
+npx @clidey/deptrust install
+pnpx @clidey/deptrust@latest install
+```
+
+The default installer is guided. It installs the binary, asks which agent integrations to configure, prints the user-level destinations before changing anything, and asks for confirmation. Add `--yes` for non-interactive binary-only installs, or pass explicit integration flags.
+
+To remove the user-level binary, skill, and MCP entries:
+
+```bash
+npx @clidey/deptrust uninstall
+pnpx @clidey/deptrust@latest uninstall
 ```
 
 Go users can install directly:
@@ -252,7 +261,7 @@ go install github.com/clidey/deptrust/cmd/deptrust@latest
 
 ## Agent Setup
 
-To install deptrust and register everything the installer can configure from your terminal:
+To install deptrust and register everything the installer can configure without the guided prompts:
 
 ```bash
 npx @clidey/deptrust install --all
