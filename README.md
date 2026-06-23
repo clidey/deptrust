@@ -1,5 +1,14 @@
 # deptrust
 
+```text
+     __           __                  __
+ ___/ /___  ___  / /________  _______/ /_
+/ _  / __ \/ _ \/ __/ ___/ / / / ___/ __/
+/  __/ /_/ /  __/ /_/ /  / /_/ (__  ) /_
+\__,_/\____/ .___/\__/_/   \__,_/____/\__/
+           /_/
+```
+
 deptrust is a CLI that checks package versions for known vulnerabilities across npm, PyPI, crates.io, and more.
 
 It runs locally as a CLI and as an MCP server. It calls public package registry and OSV APIs directly; there is no hosted deptrust service to trust or configure.
