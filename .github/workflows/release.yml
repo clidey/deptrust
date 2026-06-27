@@ -127,6 +127,41 @@ jobs:
             dist/checksums.txt
           fail_on_unmatched_files: true
 
+      - name: Update Homebrew tap
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          TAP_REPO: clidey/homebrew-tap
+          TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${HOMEBREW_TAP_TOKEN}" ]]; then
+            echo "HOMEBREW_TAP_TOKEN secret not set; skipping tap update"
+            exit 0
+          fi
+
+          # Render the formula from the release checksums.
+          ./scripts/generate-homebrew-formula.sh "$TAG" dist/checksums.txt dist/deptrust.rb
+
+          tap_dir="$(mktemp -d)"
+          git clone --depth 1 "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/${TAP_REPO}.git" "$tap_dir"
+
+          mkdir -p "$tap_dir/Formula"
+          cp dist/deptrust.rb "$tap_dir/Formula/deptrust.rb"
+
+          git -C "$tap_dir" config user.name "github-actions[bot]"
+          git -C "$tap_dir" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C "$tap_dir" add Formula/deptrust.rb
+
+          if git -C "$tap_dir" diff --cached --quiet; then
+            echo "Formula already up to date for $TAG"
+            exit 0
+          fi
+
+          git -C "$tap_dir" commit -m "deptrust $TAG"
+          git -C "$tap_dir" push origin HEAD
+
       - name: Commit stamped source version
         shell: bash
         run: |

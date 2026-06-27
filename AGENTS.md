@@ -38,5 +38,5 @@ The flow is **CLI/MCP entrypoint → `app.App` orchestrator → registry resolve
 
 - `scripts/npm-install.mjs` — the `npm`/`npx` entrypoint (`install`, `uninstall`, `skills install`, integration flags). Downloads the platform binary and registers Codex/Claude Code MCP + skills.
 - `scripts/build-release.sh`, `stamp-release-version.mjs`, `release-notes.sh` — release tooling; version is stamped into `internal/buildinfo` at build time via ldflags.
-- `packaging/homebrew/` — Homebrew formula.
+- `packaging/homebrew/deptrust.rb.tmpl` — Homebrew formula template (binary-download, per-arch). `scripts/generate-homebrew-formula.sh <tag> <checksums.txt> [out]` fills in the version and sha256s from a release `checksums.txt`. The `Update Homebrew tap` step in `release.yml` runs this and pushes `Formula/deptrust.rb` to the `clidey/homebrew-tap` repo (gated on the `HOMEBREW_TAP_TOKEN` secret). Install via `brew install clidey/tap/deptrust`. Note the release binary stamps `version` as the `v`-prefixed tag, so the formula test asserts `deptrust v#{version}`.
 - `.agents/skills/` — bundled Codex skill (non-MCP fallback).

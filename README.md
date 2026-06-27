@@ -253,6 +253,20 @@ npx @clidey/deptrust uninstall
 pnpx @clidey/deptrust@latest uninstall
 ```
 
+Homebrew users can install from the Clidey tap:
+
+```bash
+brew install clidey/tap/deptrust
+```
+
+Or tap first, then install and upgrade as usual:
+
+```bash
+brew tap clidey/tap
+brew install deptrust
+brew upgrade deptrust
+```
+
 Go users can install directly:
 
 ```bash
