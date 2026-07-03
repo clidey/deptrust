@@ -1,6 +1,6 @@
 {
   "name": "@clidey/deptrust",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Install deptrust, a local package vulnerability checker and MCP server for AI agents.",
   "license": "MIT",
   "homepage": "https://github.com/clidey/deptrust",
