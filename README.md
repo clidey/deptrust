@@ -244,7 +244,7 @@ npx @clidey/deptrust install
 pnpx @clidey/deptrust@latest install
 ```
 
-The default installer is guided. It installs the binary, asks which agent integrations to configure, prints the user-level destinations before changing anything, and asks for confirmation. Add `--yes` for non-interactive binary-only installs, or pass explicit integration flags.
+The default installer is guided. It installs the binary, asks which agent integrations to configure, prints the user-level destinations before changing anything, and asks for confirmation. The guided installer defaults to enabling MCP, the skill fallback, and shell package safety hooks for Codex and Claude Code. Add `--yes` for non-interactive binary-only installs, or pass explicit integration flags.
 
 To remove the user-level binary, skill, and MCP entries:
 
@@ -282,7 +282,9 @@ npx @clidey/deptrust install --all
 pnpx @clidey/deptrust@latest install --all
 ```
 
-`--all` installs the binary, registers Codex MCP when the `codex` CLI is available, installs the Codex skill fallback, and registers Claude Code MCP when the `claude` CLI is available.
+`--all` installs the binary, registers Codex MCP when the `codex` CLI is available, installs the Codex skill fallback, registers Claude Code MCP when the `claude` CLI is available, and installs the Codex and Claude Code shell package safety hooks.
+
+The hooks are `PreToolUse` hooks for Bash commands. They check package install commands before they run and block the command when deptrust returns `review`, `block`, or `unknown`. The installer writes user-level hook config only: `~/.codex/hooks.json` for Codex and `~/.claude/settings.json` for Claude Code.
 
 Use narrower installs when preferred:
 

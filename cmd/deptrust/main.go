@@ -12,6 +12,7 @@ import (
 
 	"github.com/clidey/deptrust/internal/app"
 	"github.com/clidey/deptrust/internal/buildinfo"
+	"github.com/clidey/deptrust/internal/hook"
 	"github.com/clidey/deptrust/internal/mcp"
 	"github.com/clidey/deptrust/internal/risk"
 )
@@ -39,6 +40,8 @@ func run(args []string, stdout, stderr io.Writer) error {
 		return runCompare(context.Background(), service, args[1:], stdout)
 	case "mcp":
 		return mcp.Serve(context.Background(), service, os.Stdin, stdout)
+	case "hook":
+		return runHook(context.Background(), service, args[1:], os.Stdin, stdout)
 	case "version":
 		printVersion(stdout)
 		return nil
@@ -48,6 +51,13 @@ func run(args []string, stdout, stderr io.Writer) error {
 	default:
 		return fmt.Errorf("unknown command %q", args[0])
 	}
+}
+
+func runHook(ctx context.Context, service app.App, args []string, stdin io.Reader, stdout io.Writer) error {
+	if len(args) != 1 || args[0] != "shell" {
+		return errors.New("usage: deptrust hook shell")
+	}
+	return hook.RunShell(ctx, service, stdin, stdout)
 }
 
 func runCheck(ctx context.Context, service app.App, args []string, stdout io.Writer) error {
@@ -159,6 +169,7 @@ Usage:
   deptrust suggest [--json] <ecosystem> <package>
   deptrust compare [--json] <ecosystem> <package> <from-version> <to-version>
   deptrust mcp
+  deptrust hook shell
   deptrust version
 
 Examples:

@@ -16,7 +16,7 @@ Reach for this whenever you add a dependency, bump or pin a version, recommend a
    - Prefer `./deptrust` in the current repository if present.
    - Otherwise try `deptrust` from `PATH`.
    - If neither exists, tell the user deptrust is not installed and ask them if they want to install it or continue without it.
-   - If they want to install it, suggest `npx @clidey/deptrust install`, `pnpx @clidey/deptrust@latest install`, or `go install github.com/clidey/deptrust/cmd/deptrust@latest`.
+   - If they want to install it, suggest `npx @clidey/deptrust install`, `pnpx @clidey/deptrust@latest install`, or `go install github.com/clidey/deptrust/cmd/deptrust@latest`. The guided npm installer can also install MCP and Codex/Claude Code shell package safety hooks.
    - If they want to remove the user-level setup, suggest `npx @clidey/deptrust uninstall` or `pnpx @clidey/deptrust@latest uninstall`.
 
 2. Before installing or upgrading a dependency, run:

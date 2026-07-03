@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { createWriteStream, existsSync, mkdirSync, chmodSync, copyFileSync, rmSync, cpSync, renameSync, readFileSync, accessSync, constants } from "node:fs";
+import { createWriteStream, existsSync, mkdirSync, chmodSync, copyFileSync, rmSync, cpSync, renameSync, readFileSync, writeFileSync, accessSync, constants } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -32,6 +32,7 @@ async function main() {
     const installPath = await installBinary(options);
     await maybeInstallSkill(options);
     maybeRegisterMCP(options, installPath);
+    maybeInstallHook(options, installPath);
     printNextSteps(installPath);
     return;
   }
@@ -63,6 +64,7 @@ async function main() {
     await confirmInstallPlan(options);
     const installPath = await installBinary(options);
     maybeRegisterMCP(options, installPath);
+    maybeInstallHook(options, installPath);
     printNextSteps(installPath);
     return;
   }
@@ -77,6 +79,7 @@ function parseOptions(args) {
     codexMCP: false,
     codexSkill: false,
     claudeCodeMCP: false,
+    hook: false,
     check: false,
     yes: false,
     guided: false,
@@ -100,10 +103,15 @@ function parseOptions(args) {
       case "--claude-code-mcp":
         options.claudeCodeMCP = true;
         break;
+      case "--hook":
+      case "--claude-code-hook":
+        options.hook = true;
+        break;
       case "--all":
         options.codexMCP = true;
         options.codexSkill = true;
         options.claudeCodeMCP = true;
+        options.hook = true;
         break;
       case "--check":
         options.check = true;
@@ -117,7 +125,7 @@ function parseOptions(args) {
     }
   }
 
-  options.guided = !options.yes && !options.codexMCP && !options.codexSkill && !options.claudeCodeMCP;
+  options.guided = !options.yes && !options.codexMCP && !options.codexSkill && !options.claudeCodeMCP && !options.hook;
   return options;
 }
 
@@ -129,12 +137,13 @@ function requiredValue(args, index, flag) {
 }
 
 function applyDefaultUninstallSelection(options) {
-  if (options.codexMCP || options.codexSkill || options.claudeCodeMCP) {
+  if (options.codexMCP || options.codexSkill || options.claudeCodeMCP || options.hook) {
     return;
   }
   options.codexMCP = true;
   options.codexSkill = true;
   options.claudeCodeMCP = true;
+  options.hook = true;
 }
 
 async function installBinary(options) {
@@ -213,6 +222,7 @@ async function maybePromptInstallOptions(options) {
     options.codexMCP = await confirm(rl, "Register Codex MCP server?", true);
     options.claudeCodeMCP = await confirm(rl, "Register Claude Code MCP server?", true);
     options.codexSkill = await confirm(rl, "Install Codex skill fallback?", true);
+    options.hook = await confirm(rl, "Install shell package safety hooks for Codex and Claude Code?", true);
   } finally {
     rl.close();
   }
@@ -241,6 +251,10 @@ function printInstallPlan(options) {
   }
   if (options.claudeCodeMCP) {
     console.log(`  Claude Code MCP: added to your Claude Code config -> ${installPath} mcp`);
+  }
+  if (options.hook) {
+    console.log(`  Codex hook: package install commands checked before Bash runs -> ${installPath} hook shell`);
+    console.log(`  Claude Code hook: package install commands checked before Bash runs -> ${installPath} hook shell`);
   }
   console.log("");
 }
@@ -279,6 +293,10 @@ function printUninstallPlan(options) {
   }
   if (options.claudeCodeMCP) {
     console.log("  Claude Code MCP: the deptrust entry in your Claude Code config");
+  }
+  if (options.hook) {
+    console.log("  Codex hook: the deptrust PreToolUse Bash hook in your Codex user hooks");
+    console.log("  Claude Code hook: the deptrust PreToolUse Bash hook in your Claude Code user settings");
   }
   console.log("");
 }
@@ -327,6 +345,11 @@ function uninstall(options) {
     } else {
       console.warn("Couldn't find the claude command, so we left Claude Code's MCP config alone.");
     }
+  }
+
+  if (options.hook) {
+    removeCodexHook();
+    removeClaudeHook();
   }
 
   console.log("All done. deptrust's user-level files are gone, and your project files were left untouched.");
@@ -447,6 +470,158 @@ function maybeRegisterMCP(options, installPath) {
       console.warn("Couldn't find the claude command, so we skipped the Claude Code setup. Install Claude Code first if you'd like it connected.");
     }
   }
+}
+
+function maybeInstallHook(options, installPath) {
+  if (!options.hook) {
+    return;
+  }
+  installCodexHook(installPath);
+  installClaudeHook(installPath);
+}
+
+function installCodexHook(installPath) {
+  const hooksPath = codexHooksPath();
+  const config = readJSONFile(hooksPath);
+  config.hooks ||= {};
+  config.hooks.PreToolUse = removeDeptrustHookEntries(config.hooks.PreToolUse || []);
+  config.hooks.PreToolUse.push({
+    matcher: "Bash",
+    hooks: [
+      {
+        type: "command",
+        command: `${shellQuote(installPath)} hook shell`,
+        statusMessage: "Checking package install safety with deptrust",
+      },
+    ],
+  });
+  writeJSONFile(hooksPath, config);
+  console.log(`Installed the deptrust Codex shell hook in ${hooksPath}.`);
+}
+
+function installClaudeHook(installPath) {
+  const settingsPath = claudeSettingsPath();
+  const settings = readJSONFile(settingsPath);
+  settings.hooks ||= {};
+  settings.hooks.PreToolUse = removeDeptrustHookEntries(settings.hooks.PreToolUse || []);
+  settings.hooks.PreToolUse.push({
+    matcher: "Bash",
+    hooks: [
+      {
+        type: "command",
+        command: installPath,
+        args: ["hook", "shell"],
+      },
+    ],
+  });
+  writeJSONFile(settingsPath, settings);
+  console.log(`Installed the deptrust Claude Code shell hook in ${settingsPath}.`);
+}
+
+function removeCodexHook() {
+  const hooksPath = codexHooksPath();
+  if (!existsSync(hooksPath)) {
+    console.log("Codex hooks were not found, so there was no deptrust hook to remove.");
+    return;
+  }
+  const config = readJSONFile(hooksPath);
+  if (!config.hooks || !Array.isArray(config.hooks.PreToolUse)) {
+    console.log("Couldn't find a deptrust Codex hook, so there was nothing to remove.");
+    return;
+  }
+  const next = removeDeptrustHookEntries(config.hooks.PreToolUse);
+  if (next.length === config.hooks.PreToolUse.length) {
+    console.log("Couldn't find a deptrust Codex hook, so there was nothing to remove.");
+    return;
+  }
+  config.hooks.PreToolUse = next;
+  if (config.hooks.PreToolUse.length === 0) {
+    delete config.hooks.PreToolUse;
+  }
+  if (Object.keys(config.hooks).length === 0) {
+    delete config.hooks;
+  }
+  writeJSONFile(hooksPath, config);
+  console.log(`Removed the deptrust Codex shell hook from ${hooksPath}.`);
+}
+
+function removeClaudeHook() {
+  const settingsPath = claudeSettingsPath();
+  if (!existsSync(settingsPath)) {
+    console.log("Claude Code settings were not found, so there was no deptrust hook to remove.");
+    return;
+  }
+  const settings = readJSONFile(settingsPath);
+  if (!settings.hooks || !Array.isArray(settings.hooks.PreToolUse)) {
+    console.log("Couldn't find a deptrust Claude Code hook, so there was nothing to remove.");
+    return;
+  }
+  const next = removeDeptrustHookEntries(settings.hooks.PreToolUse);
+  if (next.length === settings.hooks.PreToolUse.length) {
+    console.log("Couldn't find a deptrust Claude Code hook, so there was nothing to remove.");
+    return;
+  }
+  settings.hooks.PreToolUse = next;
+  if (settings.hooks.PreToolUse.length === 0) {
+    delete settings.hooks.PreToolUse;
+  }
+  if (Object.keys(settings.hooks).length === 0) {
+    delete settings.hooks;
+  }
+  writeJSONFile(settingsPath, settings);
+  console.log(`Removed the deptrust Claude Code shell hook from ${settingsPath}.`);
+}
+
+function removeDeptrustHookEntries(groups) {
+  return groups
+    .map((group) => {
+      if (!Array.isArray(group.hooks)) {
+        return group;
+      }
+      return {
+        ...group,
+        hooks: group.hooks.filter((item) => !isDeptrustHook(item)),
+      };
+    })
+    .filter((group) => Array.isArray(group.hooks) ? group.hooks.length > 0 : true);
+}
+
+function isDeptrustHook(item) {
+  if (!item || item.type !== "command") {
+    return false;
+  }
+  if (Array.isArray(item.args) && item.args[0] === "hook" && item.args[1] === "shell") {
+    return true;
+  }
+  return typeof item.command === "string" && /\bdeptrust(?:\.exe)?['"]?\s+hook\s+shell\b/.test(item.command);
+}
+
+function codexHooksPath() {
+  return join(homedir(), ".codex", "hooks.json");
+}
+
+function claudeSettingsPath() {
+  return join(homedir(), ".claude", "settings.json");
+}
+
+function shellQuote(value) {
+  return `'${String(value).replaceAll("'", "'\"'\"'")}'`;
+}
+
+function readJSONFile(path) {
+  if (!existsSync(path)) {
+    return {};
+  }
+  try {
+    return JSON.parse(readFileSync(path, "utf8"));
+  } catch (error) {
+    throw new Error(`could not parse ${path}: ${error.message}`);
+  }
+}
+
+function writeJSONFile(path, value) {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
 }
 
 function mcpServerRegistered(command, args) {
@@ -581,8 +756,9 @@ Options:
   --codex-mcp             Register Codex MCP
   --codex-skill           Install Codex skill fallback
   --claude-code-mcp       Register Claude Code MCP
-  --all                   Install binary, Codex MCP, Codex skill, and Claude Code MCP
-                          For uninstall, remove Codex MCP, Codex skill, and Claude Code MCP
+  --hook                  Install Codex and Claude Code shell package safety hooks
+  --all                   Install binary, Codex MCP, Codex skill, Claude Code MCP, and hook
+                          For uninstall, remove Codex MCP, Codex skill, Claude Code MCP, and hook
   --check                 Verify the binary exists after install
   -y, --yes               Skip interactive confirmation
 
@@ -590,6 +766,7 @@ Examples:
   npx @clidey/deptrust install
   npx @clidey/deptrust install --yes
   npx @clidey/deptrust install --all
+  npx @clidey/deptrust install --hook
   npx @clidey/deptrust uninstall
   npx @clidey/deptrust uninstall --yes
   npx @clidey/deptrust skills install
