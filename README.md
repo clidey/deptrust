@@ -273,6 +273,45 @@ Go users can install directly:
 go install github.com/clidey/deptrust/cmd/deptrust@latest
 ```
 
+### Nix
+
+The project provides optional Nix flake outputs for users who already use Nix. The flake wraps the prebuilt release binary.
+
+```bash
+# Run without installing
+nix run github:clidey/deptrust
+
+# Install into your profile
+nix profile install github:clidey/deptrust
+```
+
+The flake tracks the default branch and is auto-bumped to the latest release by a
+daily [workflow](.github/workflows/nix-release.yml), so `github:clidey/deptrust`
+always serves the current release. (Release tags are cut before the bump lands,
+so `github:clidey/deptrust/vX.Y.Z` is not a valid pin — use the
+nixpkgs package or a specific commit SHA if you need reproducibility.)
+
+### Devbox
+
+For reproducible development environments, use Devbox:
+
+```bash
+# Install Devbox first (if not already installed)
+curl -fsSL https://get.jetify.dev/devbox | bash
+
+# Initialize the environment
+devbox shell
+
+# Build the project
+devbox run build
+```
+
+Or install Devbox via Homebrew:
+
+```bash
+brew install jetify-com/devbox/devbox
+```
+
 ## Agent Setup
 
 To install deptrust and register everything the installer can configure without the guided prompts:
