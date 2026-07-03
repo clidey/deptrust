@@ -1,6 +1,9 @@
 package hook
 
-import "testing"
+import (
+	"encoding/json"
+	"testing"
+)
 
 func TestParseInstallCommand(t *testing.T) {
 	tests := []struct {
@@ -57,5 +60,76 @@ func TestParseInstallCommand(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestParseGitHubActionsUses(t *testing.T) {
+	text := `
+jobs:
+  test:
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/upload-sarif@v3.28.10
+      - uses: ./local-action
+      - uses: docker://alpine:3
+`
+	want := []packageRequest{
+		{Ecosystem: "github-actions", Name: "actions/checkout", Version: "v4"},
+		{Ecosystem: "github-actions", Name: "github/codeql-action", Version: "v3.28.10"},
+	}
+	got := ParseGitHubActionsUses(text, false)
+	assertRequests(t, got, want)
+}
+
+func TestParseGitHubActionsUsesPatchAddedLinesOnly(t *testing.T) {
+	patch := `
+@@
+-      - uses: actions/checkout@v3
++      - uses: actions/checkout@v4
+       - run: go test ./...
+`
+	want := []packageRequest{{Ecosystem: "github-actions", Name: "actions/checkout", Version: "v4"}}
+	got := ParseGitHubActionsUses(patch, true)
+	assertRequests(t, got, want)
+}
+
+func TestParseHookInputFromWrite(t *testing.T) {
+	input := hookInput{
+		ToolName: "Write",
+		ToolInput: map[string]json.RawMessage{
+			"file_path": json.RawMessage(`".github/workflows/ci.yml"`),
+			"content":   json.RawMessage(`"jobs:\n  test:\n    steps:\n      - uses: actions/setup-go@v6.1.0\n"`),
+		},
+	}
+	want := []packageRequest{{Ecosystem: "github-actions", Name: "actions/setup-go", Version: "v6.1.0"}}
+	got := ParseHookInput(input)
+	assertRequests(t, got, want)
+}
+
+func TestParseHookInputDedupesCommandAndWorkflow(t *testing.T) {
+	input := hookInput{
+		ToolName: "Bash",
+		ToolInput: map[string]json.RawMessage{
+			"command": json.RawMessage(`"npm install lodash@4.17.21"`),
+			"patch":   json.RawMessage(`"+      - uses: actions/checkout@v4\n+      - uses: actions/checkout@v4\n"`),
+		},
+	}
+	want := []packageRequest{
+		{Ecosystem: "npm", Name: "lodash", Version: "4.17.21"},
+		{Ecosystem: "github-actions", Name: "actions/checkout", Version: "v4"},
+	}
+	got := ParseHookInput(input)
+	assertRequests(t, got, want)
+}
+
+func assertRequests(t *testing.T, got, want []packageRequest) {
+	t.Helper()
+	if len(got) != len(want) {
+		t.Fatalf("requests = %#v, want %#v", got, want)
+	}
+	for i := range got {
+		if got[i] != want[i] {
+			t.Fatalf("requests[%d] = %#v, want %#v", i, got[i], want[i])
+		}
 	}
 }

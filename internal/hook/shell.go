@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 
 	"github.com/clidey/deptrust/internal/app"
@@ -12,11 +13,9 @@ import (
 	"github.com/clidey/deptrust/internal/risk"
 )
 
-type claudeHookInput struct {
-	ToolName  string `json:"tool_name"`
-	ToolInput struct {
-		Command string `json:"command"`
-	} `json:"tool_input"`
+type hookInput struct {
+	ToolName  string                     `json:"tool_name"`
+	ToolInput map[string]json.RawMessage `json:"tool_input"`
 }
 
 type claudeHookOutput struct {
@@ -36,15 +35,12 @@ type packageRequest struct {
 }
 
 func RunShell(ctx context.Context, service app.App, in io.Reader, out io.Writer) error {
-	var input claudeHookInput
+	var input hookInput
 	if err := json.NewDecoder(in).Decode(&input); err != nil {
 		return nil
 	}
-	if input.ToolName != "" && input.ToolName != "Bash" {
-		return nil
-	}
 
-	requests := ParseInstallCommand(input.ToolInput.Command)
+	requests := ParseHookInput(input)
 	for _, request := range requests {
 		query, err := app.ParseQuery(request.Ecosystem, request.Name, request.Version)
 		if err != nil {
@@ -60,6 +56,15 @@ func RunShell(ctx context.Context, service app.App, in io.Reader, out io.Writer)
 		}
 	}
 	return nil
+}
+
+func ParseHookInput(input hookInput) []packageRequest {
+	var out []packageRequest
+	if command := toolInputString(input.ToolInput, "command"); command != "" {
+		out = append(out, ParseInstallCommand(command)...)
+	}
+	out = append(out, parseGitHubActionsToolInput(input)...)
+	return dedupeRequests(out)
 }
 
 func ParseInstallCommand(command string) []packageRequest {
@@ -97,6 +102,104 @@ func ParseInstallCommand(command string) []packageRequest {
 	default:
 		return nil
 	}
+}
+
+var githubActionsUsesRe = regexp.MustCompile(`(?m)^\s*\+?\s*(?:-\s*)?uses:\s*['"]?([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)(?:/[^\s#'"]+)?@([^\s#'"]+)`)
+
+func parseGitHubActionsToolInput(input hookInput) []packageRequest {
+	var out []packageRequest
+	for _, candidate := range toolInputActionTexts(input.ToolInput) {
+		out = append(out, ParseGitHubActionsUses(candidate.text, candidate.addedOnly)...)
+	}
+	return out
+}
+
+type actionText struct {
+	text      string
+	addedOnly bool
+}
+
+func toolInputActionTexts(input map[string]json.RawMessage) []actionText {
+	var out []actionText
+	for key, raw := range input {
+		out = append(out, actionTextsFromRaw(strings.ToLower(key), raw)...)
+	}
+	return out
+}
+
+func actionTextsFromRaw(key string, raw json.RawMessage) []actionText {
+	if len(raw) == 0 {
+		return nil
+	}
+	var text string
+	if err := json.Unmarshal(raw, &text); err == nil {
+		switch key {
+		case "content", "new_string":
+			return []actionText{{text: text}}
+		case "patch":
+			return []actionText{{text: text, addedOnly: true}}
+		default:
+			return nil
+		}
+	}
+	var list []json.RawMessage
+	if err := json.Unmarshal(raw, &list); err == nil {
+		var out []actionText
+		for _, item := range list {
+			out = append(out, actionTextsFromRaw(key, item)...)
+		}
+		return out
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &object); err != nil {
+		return nil
+	}
+	var out []actionText
+	for nestedKey, nestedRaw := range object {
+		out = append(out, actionTextsFromRaw(strings.ToLower(nestedKey), nestedRaw)...)
+	}
+	return out
+}
+
+func ParseGitHubActionsUses(text string, addedOnly bool) []packageRequest {
+	var out []packageRequest
+	for _, line := range strings.Split(text, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if addedOnly && !strings.HasPrefix(trimmed, "+") {
+			continue
+		}
+		match := githubActionsUsesRe.FindStringSubmatch(line)
+		if len(match) != 3 {
+			continue
+		}
+		out = appendPackage(out, "github-actions", match[1], strings.TrimSuffix(match[2], ","))
+	}
+	return out
+}
+
+func toolInputString(input map[string]json.RawMessage, key string) string {
+	raw, ok := input[key]
+	if !ok {
+		return ""
+	}
+	var value string
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return ""
+	}
+	return value
+}
+
+func dedupeRequests(requests []packageRequest) []packageRequest {
+	seen := map[packageRequest]struct{}{}
+	var out []packageRequest
+	for _, request := range requests {
+		if _, ok := seen[request]; ok {
+			continue
+		}
+		seen[request] = struct{}{}
+		out = append(out, request)
+	}
+	return out
 }
 
 func deny(out io.Writer, reason string) error {

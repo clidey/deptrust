@@ -54,8 +54,8 @@ func run(args []string, stdout, stderr io.Writer) error {
 }
 
 func runHook(ctx context.Context, service app.App, args []string, stdin io.Reader, stdout io.Writer) error {
-	if len(args) != 1 || args[0] != "shell" {
-		return errors.New("usage: deptrust hook shell")
+	if len(args) != 1 || (args[0] != "shell" && args[0] != "tool") {
+		return errors.New("usage: deptrust hook tool")
 	}
 	return hook.RunShell(ctx, service, stdin, stdout)
 }
@@ -169,7 +169,7 @@ Usage:
   deptrust suggest [--json] <ecosystem> <package>
   deptrust compare [--json] <ecosystem> <package> <from-version> <to-version>
   deptrust mcp
-  deptrust hook shell
+  deptrust hook tool
   deptrust version
 
 Examples:
