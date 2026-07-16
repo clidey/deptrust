@@ -97,6 +97,82 @@ func TestResolveMavenLatest(t *testing.T) {
 	}
 }
 
+func TestResolveMavenUsesCanonicalMetadataInsteadOfStaleSearch(t *testing.T) {
+	client := fakeHTTPClient{responses: map[string]fakeResponse{
+		"/maven2/io/javalin/javalin/maven-metadata.xml": {
+			status: http.StatusOK,
+			body: `
+				<metadata>
+					<versioning>
+						<latest>7.0.0</latest>
+						<release>7.0.0</release>
+						<versions>
+							<version>6.7.0</version>
+							<version>7.0.0</version>
+						</versions>
+					</versioning>
+				</metadata>`,
+		},
+		"/solrsearch/select?" + mavenQueryKey("io.javalin", "javalin"): {
+			status: http.StatusOK,
+			body: `{
+				"response": {
+					"docs": [
+						{"g":"io.javalin","a":"javalin","v":"6.7.0","timestamp":1750610975705}
+					]
+				}
+			}`,
+		},
+		"/maven2/io/javalin/javalin/7.0.0/javalin-7.0.0.pom": {
+			status: http.StatusOK,
+			header: http.Header{"Last-Modified": []string{"Sun, 22 Feb 2026 13:04:00 GMT"}},
+		},
+	}}
+
+	got, err := resolveMaven(context.Background(), client, models.Query{
+		Ecosystem: models.EcosystemMaven,
+		Package:   "io.javalin:javalin",
+		Version:   models.LatestVersion,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Version != "7.0.0" || got.Latest != "7.0.0" {
+		t.Fatalf("got version/latest %q/%q, want 7.0.0/7.0.0", got.Version, got.Latest)
+	}
+	if got.PublishedAt == nil || got.PublishedAt.Year() != 2026 {
+		t.Fatalf("PublishedAt = %v, want POM Last-Modified timestamp", got.PublishedAt)
+	}
+}
+
+func TestResolveMavenExactVersionFromCanonicalMetadata(t *testing.T) {
+	client := fakeHTTPClient{responses: map[string]fakeResponse{
+		"/maven2/org/junit/jupiter/junit-jupiter/maven-metadata.xml": {
+			status: http.StatusOK,
+			body: `
+				<metadata>
+					<versioning>
+						<latest>6.0.0</latest>
+						<release>6.0.0</release>
+						<versions><version>5.13.0-M3</version><version>6.0.0</version></versions>
+					</versioning>
+				</metadata>`,
+		},
+	}}
+
+	got, err := resolveMaven(context.Background(), client, models.Query{
+		Ecosystem: models.EcosystemMaven,
+		Package:   "org.junit.jupiter:junit-jupiter",
+		Version:   "6.0.0",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Version != "6.0.0" {
+		t.Fatalf("Version = %q, want 6.0.0", got.Version)
+	}
+}
+
 func TestResolveMavenRequiresGroupArtifact(t *testing.T) {
 	_, err := resolveMaven(context.Background(), fakeHTTPClient{}, models.Query{
 		Ecosystem: models.EcosystemMaven,

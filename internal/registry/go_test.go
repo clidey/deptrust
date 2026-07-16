@@ -17,6 +17,7 @@ type fakeHTTPClient struct {
 type fakeResponse struct {
 	status int
 	body   string
+	header http.Header
 }
 
 func (f fakeHTTPClient) Do(req *http.Request) (*http.Response, error) {
@@ -34,6 +35,7 @@ func (f fakeHTTPClient) Do(req *http.Request) (*http.Response, error) {
 	return &http.Response{
 		StatusCode: response.status,
 		Body:       io.NopCloser(strings.NewReader(response.body)),
+		Header:     response.header,
 	}, nil
 }
 
