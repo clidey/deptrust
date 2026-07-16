@@ -46,15 +46,17 @@ func resolveCargo(ctx context.Context, client HTTPClient, query models.Query) (V
 
 	versions := make([]string, 0, len(metadata.Versions))
 	latest := ""
-	versionSet := map[string]struct{}{}
+	allVersionSet := map[string]struct{}{}
+	yankedVersions := map[string]struct{}{}
 	publishedAtByVersion := map[string]*time.Time{}
 	for _, version := range metadata.Versions {
+		allVersionSet[version.Num] = struct{}{}
+		publishedAtByVersion[version.Num] = parseTime(version.CreatedAt)
 		if version.Yanked {
+			yankedVersions[version.Num] = struct{}{}
 			continue
 		}
 		versions = append(versions, version.Num)
-		versionSet[version.Num] = struct{}{}
-		publishedAtByVersion[version.Num] = parseTime(version.CreatedAt)
 		if latest == "" {
 			latest = version.Num
 		}
@@ -67,8 +69,19 @@ func resolveCargo(ctx context.Context, client HTTPClient, query models.Query) (V
 	if requested == "" {
 		return VersionInfo{}, fmt.Errorf("crate %q does not declare a latest non-yanked version", query.Package)
 	}
-	if _, ok := versionSet[requested]; !ok {
+	if _, ok := allVersionSet[requested]; !ok {
 		return VersionInfo{}, VersionNotFoundError{Package: query.Package, Version: requested, Latest: latest}
+	}
+
+	var signals []models.Signal
+	if _, yanked := yankedVersions[requested]; yanked {
+		signals = []models.Signal{{
+			Type:     "yanked_release",
+			Severity: "medium",
+			Score:    50,
+			Message:  fmt.Sprintf("%s %s is yanked on crates.io and should not be selected for a new install.", query.Package, requested),
+			Source:   "crates.io",
+		}}
 	}
 
 	return VersionInfo{
@@ -79,5 +92,6 @@ func resolveCargo(ctx context.Context, client HTTPClient, query models.Query) (V
 		Versions:             versions,
 		PublishedAt:          publishedAtByVersion[requested],
 		PublishedAtByVersion: publishedAtByVersion,
+		Signals:              signals,
 	}, nil
 }

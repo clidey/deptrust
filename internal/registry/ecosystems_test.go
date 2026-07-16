@@ -65,6 +65,36 @@ func TestResolveNuGetExactVersionCaseInsensitive(t *testing.T) {
 	}
 }
 
+func TestResolveCargoAllowsYankedExactVersionButExcludesItFromSuggestions(t *testing.T) {
+	client := fakeHTTPClient{responses: map[string]fakeResponse{
+		"/api/v1/crates/serde/versions": {
+			status: http.StatusOK,
+			body: `{"versions":[
+				{"num":"1.0.228","yanked":false,"created_at":"2025-09-27T00:00:00Z"},
+				{"num":"1.0.95","yanked":true,"created_at":"2019-05-20T00:00:00Z"}
+			]}`,
+		},
+	}}
+
+	got, err := resolveCargo(context.Background(), client, models.Query{
+		Ecosystem: models.EcosystemCargo,
+		Package:   "serde",
+		Version:   "1.0.95",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Version != "1.0.95" {
+		t.Fatalf("Version = %q, want 1.0.95", got.Version)
+	}
+	if len(got.Versions) != 1 || got.Versions[0] != "1.0.228" {
+		t.Fatalf("Versions = %#v, want only non-yanked suggestion candidates", got.Versions)
+	}
+	if len(got.Signals) != 1 || got.Signals[0].Type != "yanked_release" {
+		t.Fatalf("Signals = %#v, want yanked_release", got.Signals)
+	}
+}
+
 func TestResolveMavenLatest(t *testing.T) {
 	query := mavenQueryKey("com.google.guava", "guava")
 	client := fakeHTTPClient{responses: map[string]fakeResponse{
@@ -211,6 +241,27 @@ func TestResolvePackagistLatest(t *testing.T) {
 	}
 }
 
+func TestResolvePackagistDevVersionFromDevMetadata(t *testing.T) {
+	client := fakeHTTPClient{responses: map[string]fakeResponse{
+		"/p2/monolog/monolog~dev.json": {
+			status: http.StatusOK,
+			body:   `{"packages":{"monolog/monolog":[{"version":"dev-main","time":"2026-06-01T00:00:00Z"}]}}`,
+		},
+	}}
+
+	got, err := resolvePackagist(context.Background(), client, models.Query{
+		Ecosystem: models.EcosystemPackagist,
+		Package:   "monolog/monolog",
+		Version:   "dev-main",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Version != "dev-main" {
+		t.Fatalf("Version = %q, want dev-main", got.Version)
+	}
+}
+
 func TestResolvePubExactVersion(t *testing.T) {
 	client := fakeHTTPClient{responses: map[string]fakeResponse{
 		"/api/packages/http": {
@@ -315,11 +366,38 @@ func TestResolveHackageLatest(t *testing.T) {
 	}
 }
 
+func TestResolveHackageAllowsDeprecatedExactVersionButExcludesItFromSuggestions(t *testing.T) {
+	client := fakeHTTPClient{responses: map[string]fakeResponse{
+		"/package/aeson/preferred.json": {
+			status: http.StatusOK,
+			body:   `{"normal-version":["2.3.1.0"],"deprecated-version":["0.10.0.0"]}`,
+		},
+	}}
+
+	got, err := resolveHackage(context.Background(), client, models.Query{
+		Ecosystem: models.EcosystemHackage,
+		Package:   "aeson",
+		Version:   "0.10.0.0",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Version != "0.10.0.0" {
+		t.Fatalf("Version = %q, want 0.10.0.0", got.Version)
+	}
+	if len(got.Versions) != 1 || got.Versions[0] != "2.3.1.0" {
+		t.Fatalf("Versions = %#v, want only normal suggestion candidates", got.Versions)
+	}
+	if len(got.Signals) != 1 || got.Signals[0].Type != "deprecated_release" {
+		t.Fatalf("Signals = %#v, want deprecated_release", got.Signals)
+	}
+}
+
 func TestResolveGitHubActionsExactTag(t *testing.T) {
 	client := fakeHTTPClient{responses: map[string]fakeResponse{
-		"/repos/actions/checkout/tags?per_page=100": {
+		"/actions/checkout/tar.gz/v6.0.3": {
 			status: http.StatusOK,
-			body:   `[{"name":"v7.0.0"},{"name":"v6.0.3"}]`,
+			body:   `{}`,
 		},
 	}}
 
@@ -331,20 +409,20 @@ func TestResolveGitHubActionsExactTag(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Version != "v6.0.3" || got.Latest != "v7.0.0" {
-		t.Fatalf("got version/latest %q/%q, want v6.0.3/v7.0.0", got.Version, got.Latest)
+	if got.Version != "v6.0.3" {
+		t.Fatalf("Version = %q, want v6.0.3", got.Version)
 	}
 }
 
 func TestResolveGitHubActionsAcceptsCommitSHA(t *testing.T) {
+	sha := "9c091bbab93c267b02d269664d8ff18d57303105"
 	client := fakeHTTPClient{responses: map[string]fakeResponse{
-		"/repos/actions/checkout/tags?per_page=100": {
+		"/actions/checkout/tar.gz/" + sha: {
 			status: http.StatusOK,
-			body:   `[{"name":"v7.0.0"}]`,
+			body:   `{}`,
 		},
 	}}
 
-	sha := "9c091bbab93c267b02d269664d8ff18d57303105"
 	got, err := resolveGitHubActions(context.Background(), client, models.Query{
 		Ecosystem: models.EcosystemGitHubActions,
 		Package:   "actions/checkout",
@@ -360,11 +438,7 @@ func TestResolveGitHubActionsAcceptsCommitSHA(t *testing.T) {
 
 func TestResolveGitHubActionsAcceptsExistingBranch(t *testing.T) {
 	client := fakeHTTPClient{responses: map[string]fakeResponse{
-		"/repos/actions/checkout/tags?per_page=100": {
-			status: http.StatusOK,
-			body:   `[{"name":"v7.0.0"}]`,
-		},
-		"/repos/actions/checkout/git/ref/heads/main": {
+		"/actions/checkout/tar.gz/main": {
 			status: http.StatusOK,
 			body:   `{}`,
 		},
@@ -380,6 +454,44 @@ func TestResolveGitHubActionsAcceptsExistingBranch(t *testing.T) {
 	}
 	if got.Version != "main" {
 		t.Fatalf("Version = %q, want main", got.Version)
+	}
+}
+
+func TestResolveGitHubActionsLatestFollowsTagPagination(t *testing.T) {
+	client := fakeHTTPClient{responses: map[string]fakeResponse{
+		"/repos/github/codeql-action/tags?per_page=100": {
+			status: http.StatusOK,
+			body:   `[{"name":"v3.28.12"}]`,
+			header: http.Header{"Link": []string{`<https://api.github.com/repos/github/codeql-action/tags?per_page=100&page=2>; rel="next"`}},
+		},
+		"/repos/github/codeql-action/tags?per_page=100&page=2": {
+			status: http.StatusOK,
+			body:   `[{"name":"v3.28.13"}]`,
+		},
+	}}
+
+	got, err := resolveGitHubActions(context.Background(), client, models.Query{
+		Ecosystem: models.EcosystemGitHubActions,
+		Package:   "github/codeql-action",
+		Version:   models.LatestVersion,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Version != "v3.28.13" || len(got.Versions) != 2 {
+		t.Fatalf("got version/versions %q/%#v, want paginated v3.28.13", got.Version, got.Versions)
+	}
+}
+
+func TestResolveGitHubActionsRejectsUnknownCommitSHA(t *testing.T) {
+	sha := "9c091bbab93c267b02d269664d8ff18d57303105"
+	_, err := resolveGitHubActions(context.Background(), fakeHTTPClient{}, models.Query{
+		Ecosystem: models.EcosystemGitHubActions,
+		Package:   "actions/checkout",
+		Version:   sha,
+	})
+	if err == nil {
+		t.Fatal("expected unknown commit SHA to be rejected")
 	}
 }
 

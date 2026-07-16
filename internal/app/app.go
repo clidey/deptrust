@@ -65,7 +65,15 @@ func (a App) CheckPackage(ctx context.Context, query models.Query) (models.Check
 
 	resolved, err := a.registry.Resolve(ctx, query)
 	if err != nil {
-		return models.CheckResult{}, err
+		if strings.EqualFold(query.Version, models.LatestVersion) || definitiveRegistryError(err) || ctx.Err() != nil {
+			return models.CheckResult{}, err
+		}
+		result := a.checkResolved(ctx, registry.VersionInfo{
+			Ecosystem: query.Ecosystem,
+			Package:   query.Package,
+			Version:   query.Version,
+		})
+		return markRegistryUnverified(result, err), nil
 	}
 	result := a.checkResolved(ctx, resolved)
 	if query.Version == "" || strings.EqualFold(query.Version, models.LatestVersion) {
@@ -87,7 +95,8 @@ func (a App) checkResolved(ctx context.Context, resolved registry.VersionInfo) m
 	vulns := vulnResult.Vulnerabilities
 	providerErrors := vulnResult.ProviderErrors
 	sortVulnerabilities(vulns)
-	signals := a.signals(pkg)
+	signals := append([]models.Signal{}, resolved.Signals...)
+	signals = append(signals, a.signals(pkg)...)
 	assessment := risk.Score(pkg, vulns, signals, providerErrors)
 
 	result := models.CheckResult{
@@ -112,7 +121,35 @@ func (a App) checkResolved(ctx context.Context, resolved registry.VersionInfo) m
 		SkippedProviders:          vulnResult.SkippedProviders,
 		AdvisoryCoverage:          vulnResult.AdvisoryCoverage,
 		AdvisoryCoverageReason:    vulnResult.CoverageReason,
+		RegistryVerification:      "verified",
 	}
+	return result
+}
+
+func definitiveRegistryError(err error) bool {
+	var packageNotFound registry.PackageNotFoundError
+	if errors.As(err, &packageNotFound) {
+		return true
+	}
+	var versionNotFound registry.VersionNotFoundError
+	return errors.As(err, &versionNotFound)
+}
+
+func markRegistryUnverified(result models.CheckResult, registryErr error) models.CheckResult {
+	result.RegistryVerification = "unverified"
+	result.RegistryVerificationReason = registryErr.Error()
+	result.Summary += " Registry verification was unavailable, so package existence and release metadata were not confirmed."
+	if result.Recommendation != risk.RecommendationAllow {
+		return result
+	}
+	result.SafeToUse = false
+	result.ShouldInstall = false
+	result.Recommendation = risk.RecommendationUnknown
+	if len(result.Vulnerabilities) == 0 && len(result.Signals) == 0 {
+		result.Classification = risk.ClassificationUnknown
+	}
+	result.Reason = "Registry verification was unavailable; advisory results alone cannot establish that this exact package version is valid or safe."
+	result.NextAction = "retry_or_check_manually"
 	return result
 }
 

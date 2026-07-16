@@ -3,6 +3,7 @@ package registry
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -21,47 +22,56 @@ type goVersionInfo struct {
 
 func resolveGo(ctx context.Context, client HTTPClient, query models.Query) (VersionInfo, error) {
 	escapedModule := escapeGoModulePath(query.Package)
+	requested := strings.TrimSpace(query.Version)
+	explicitVersion := requested != "" && !strings.EqualFold(requested, models.LatestVersion)
+	if explicitVersion {
+		requestedInfo, err := fetchGoVersionInfo(ctx, client, escapedModule, requested)
+		if err != nil {
+			var notFound PackageNotFoundError
+			if errors.As(err, &notFound) {
+				return VersionInfo{}, VersionNotFoundError{Package: query.Package, Version: requested}
+			}
+			return VersionInfo{}, err
+		}
+		if requestedInfo.Version == "" {
+			return VersionInfo{}, VersionNotFoundError{Package: query.Package, Version: requested}
+		}
+		publishedAt := parseTime(requestedInfo.Time)
+		return VersionInfo{
+			Ecosystem:            query.Ecosystem,
+			Package:              query.Package,
+			Version:              requestedInfo.Version,
+			PublishedAt:          publishedAt,
+			PublishedAtByVersion: map[string]*time.Time{requestedInfo.Version: publishedAt},
+		}, nil
+	}
 
 	versions, err := fetchGoVersions(ctx, client, escapedModule, query.Package)
 	if err != nil {
 		return VersionInfo{}, err
 	}
 
-	latestInfo, err := fetchGoLatest(ctx, client, escapedModule)
+	latest := ""
+	latestInfo := goVersionInfo{}
+	if len(versions) > 0 {
+		latest = versions[0]
+		latestInfo, err = fetchGoVersionInfo(ctx, client, escapedModule, latest)
+	} else {
+		latestInfo, err = fetchGoLatest(ctx, client, escapedModule)
+		latest = latestInfo.Version
+	}
 	if err != nil {
 		return VersionInfo{}, err
 	}
-	latest := latestInfo.Version
-	if latest == "" && len(versions) > 0 {
-		latest = versions[0]
-	}
 
-	requested := strings.TrimSpace(query.Version)
-	if requested == "" || strings.EqualFold(requested, models.LatestVersion) {
-		requested = latest
-	}
+	requested = latest
 	if requested == "" {
 		return VersionInfo{}, fmt.Errorf("go module %q does not declare a latest version", query.Package)
-	}
-
-	versionSet := map[string]struct{}{}
-	for _, version := range versions {
-		versionSet[version] = struct{}{}
-	}
-	if _, ok := versionSet[requested]; !ok {
-		return VersionInfo{}, VersionNotFoundError{Package: query.Package, Version: requested, Latest: latest}
 	}
 
 	publishedAtByVersion := map[string]*time.Time{}
 	if latestInfo.Version != "" {
 		publishedAtByVersion[latestInfo.Version] = parseTime(latestInfo.Time)
-	}
-	if requested != latestInfo.Version {
-		requestedInfo, err := fetchGoVersionInfo(ctx, client, escapedModule, requested)
-		if err != nil {
-			return VersionInfo{}, err
-		}
-		publishedAtByVersion[requested] = parseTime(requestedInfo.Time)
 	}
 
 	return VersionInfo{
@@ -143,6 +153,12 @@ func fetchGoInfo(req *http.Request, client HTTPClient) (goVersionInfo, error) {
 	resp, err := client.Do(req)
 	if err != nil {
 		return goVersionInfo{}, fmt.Errorf("fetch Go module version info: %w", err)
+	}
+	if resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusGone {
+		if err := resp.Body.Close(); err != nil {
+			return goVersionInfo{}, fmt.Errorf("close Go module version response: %w", err)
+		}
+		return goVersionInfo{}, PackageNotFoundError{}
 	}
 
 	var info goVersionInfo

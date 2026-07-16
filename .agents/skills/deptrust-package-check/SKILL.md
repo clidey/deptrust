@@ -45,7 +45,8 @@ Use:
    - `recommendation: "block"` means do not install that exact version.
    - `recommendation: "review"` means ask the user or choose a safer version.
    - `recommendation: "allow"` means no blocking known vulnerability was found by the configured providers.
-   - `recommendation: "unknown"` means provider failure or incomplete assessment; do not treat it as safe.
+   - `recommendation: "unknown"` means provider failure, unavailable registry verification, or another incomplete assessment; do not treat it as safe.
+   - `registry_verification: "unverified"` means advisory checks continued for an explicit version after a transient registry failure. Do not install based on that result; retry or verify the version manually.
 
 4. If the requested version is blocked or unknown, run:
 

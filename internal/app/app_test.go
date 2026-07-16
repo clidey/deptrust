@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -13,9 +14,14 @@ import (
 type fakeRegistry struct {
 	versions  []string
 	published map[string]*time.Time
+	signals   []models.Signal
+	err       error
 }
 
 func (f fakeRegistry) Resolve(_ context.Context, query models.Query) (registry.VersionInfo, error) {
+	if f.err != nil {
+		return registry.VersionInfo{}, f.err
+	}
 	version := query.Version
 	if version == "" || version == models.LatestVersion {
 		version = f.versions[0]
@@ -38,7 +44,123 @@ func (f fakeRegistry) Resolve(_ context.Context, query models.Query) (registry.V
 		Versions:             f.versions,
 		PublishedAt:          f.published[version],
 		PublishedAtByVersion: f.published,
+		Signals:              f.signals,
 	}, nil
+}
+
+func TestCheckExactVersionContinuesAdvisoriesWhenRegistryUnavailable(t *testing.T) {
+	service := App{
+		registry:  fakeRegistry{err: errors.New("registry timed out")},
+		providers: []vulnerabilityClient{fakeOSV{}},
+		now:       time.Now,
+	}
+
+	result, err := service.CheckPackage(context.Background(), models.Query{
+		Ecosystem: models.EcosystemNPM,
+		Package:   "pkg",
+		Version:   "1.2.3",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.RegistryVerification != "unverified" {
+		t.Fatalf("RegistryVerification = %q, want unverified", result.RegistryVerification)
+	}
+	if result.Recommendation != risk.RecommendationUnknown || result.SafeToUse || result.ShouldInstall {
+		t.Fatalf("result = %#v, want non-installable unknown recommendation", result)
+	}
+	if len(result.CheckedProviders) != 1 {
+		t.Fatalf("CheckedProviders = %#v, want advisory provider to run", result.CheckedProviders)
+	}
+}
+
+func TestCheckLatestStillRequiresRegistry(t *testing.T) {
+	service := App{
+		registry:  fakeRegistry{err: errors.New("registry timed out")},
+		providers: []vulnerabilityClient{fakeOSV{}},
+		now:       time.Now,
+	}
+
+	_, err := service.CheckPackage(context.Background(), models.Query{
+		Ecosystem: models.EcosystemNPM,
+		Package:   "pkg",
+		Version:   models.LatestVersion,
+	})
+	if err == nil {
+		t.Fatal("expected latest check to require registry resolution")
+	}
+}
+
+func TestCheckExactVersionPreservesBlockWhenRegistryUnavailable(t *testing.T) {
+	service := App{
+		registry: fakeRegistry{err: errors.New("registry timed out")},
+		providers: []vulnerabilityClient{fakeOSV{vulns: map[string][]models.Vulnerability{
+			"1.2.3": {{ID: "GHSA-test", Severity: "high", Source: "OSV"}},
+		}}},
+		now: time.Now,
+	}
+
+	result, err := service.CheckPackage(context.Background(), models.Query{
+		Ecosystem: models.EcosystemNPM,
+		Package:   "pkg",
+		Version:   "1.2.3",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Recommendation != risk.RecommendationBlock {
+		t.Fatalf("Recommendation = %q, want block", result.Recommendation)
+	}
+	if result.RegistryVerification != "unverified" {
+		t.Fatalf("RegistryVerification = %q, want unverified", result.RegistryVerification)
+	}
+}
+
+func TestCheckExactVersionKeepsDefinitiveRegistryErrors(t *testing.T) {
+	service := App{
+		registry: fakeRegistry{err: registry.VersionNotFoundError{
+			Package: "pkg",
+			Version: "9.9.9",
+		}},
+		providers: []vulnerabilityClient{fakeOSV{}},
+		now:       time.Now,
+	}
+
+	_, err := service.CheckPackage(context.Background(), models.Query{
+		Ecosystem: models.EcosystemNPM,
+		Package:   "pkg",
+		Version:   "9.9.9",
+	})
+	if err == nil {
+		t.Fatal("expected definitive version-not-found error")
+	}
+}
+
+func TestCheckIncludesRegistryRiskSignals(t *testing.T) {
+	service := App{
+		registry: fakeRegistry{
+			versions: []string{"1.0.0"},
+			signals: []models.Signal{{
+				Type:     "yanked_release",
+				Severity: "medium",
+				Score:    50,
+			}},
+		},
+		providers: []vulnerabilityClient{fakeOSV{}},
+		now:       time.Now,
+	}
+
+	result, err := service.CheckPackage(context.Background(), models.Query{
+		Ecosystem: models.EcosystemCargo,
+		Package:   "pkg",
+		Version:   "1.0.0",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Recommendation != risk.RecommendationReview || result.SafeToUse {
+		t.Fatalf("result = %#v, want review for registry risk signal", result)
+	}
 }
 
 type fakeOSV struct {

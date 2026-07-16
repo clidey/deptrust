@@ -40,23 +40,41 @@ func resolveHackage(ctx context.Context, client HTTPClient, query models.Query) 
 		return VersionInfo{}, err
 	}
 
-	versionSet := map[string]struct{}{}
+	normalVersionSet := map[string]struct{}{}
+	allVersionSet := map[string]struct{}{}
+	deprecatedVersionSet := map[string]struct{}{}
 	for _, version := range metadata.NormalVersion {
-		versionSet[version] = struct{}{}
+		normalVersionSet[version] = struct{}{}
+		allVersionSet[version] = struct{}{}
 	}
-	if len(versionSet) == 0 {
-		for _, version := range metadata.DeprecatedVersion {
-			versionSet[version] = struct{}{}
-		}
+	for _, version := range metadata.DeprecatedVersion {
+		deprecatedVersionSet[version] = struct{}{}
+		allVersionSet[version] = struct{}{}
 	}
-	if len(versionSet) == 0 {
+	if len(allVersionSet) == 0 {
 		return VersionInfo{}, PackageNotFoundError{Package: query.Package}
 	}
-	versions := sortedVersionKeys(versionSet)
-	latest := versions[0]
-	requested := canonicalRequestedVersion(query.Version, latest, versionSet)
-	if _, ok := versionSet[requested]; !ok {
+	versions := sortedVersionKeys(normalVersionSet)
+	latest := ""
+	if len(versions) > 0 {
+		latest = versions[0]
+	} else {
+		latest = sortedVersionKeys(deprecatedVersionSet)[0]
+	}
+	requested := canonicalRequestedVersion(query.Version, latest, allVersionSet)
+	if _, ok := allVersionSet[requested]; !ok {
 		return VersionInfo{}, VersionNotFoundError{Package: query.Package, Version: strings.TrimSpace(query.Version), Latest: latest}
+	}
+
+	var signals []models.Signal
+	if _, deprecated := deprecatedVersionSet[requested]; deprecated {
+		signals = []models.Signal{{
+			Type:     "deprecated_release",
+			Severity: "medium",
+			Score:    50,
+			Message:  fmt.Sprintf("%s %s is deprecated on Hackage and should not be selected for a new install.", query.Package, requested),
+			Source:   "Hackage",
+		}}
 	}
 
 	return VersionInfo{
@@ -65,5 +83,6 @@ func resolveHackage(ctx context.Context, client HTTPClient, query models.Query) 
 		Version:   requested,
 		Latest:    latest,
 		Versions:  versions,
+		Signals:   signals,
 	}, nil
 }

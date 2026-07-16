@@ -212,6 +212,8 @@ type CheckResult struct {
 	SkippedProviders           []SkippedProvider `json:"skipped_providers,omitempty"`
 	AdvisoryCoverage           string            `json:"advisory_coverage"`
 	AdvisoryCoverageReason     string            `json:"advisory_coverage_reason,omitempty"`
+	RegistryVerification       string            `json:"registry_verification"`
+	RegistryVerificationReason string            `json:"registry_verification_reason,omitempty"`
 	ResolvedFromVersionRequest string            `json:"resolved_from_version_request,omitempty"`
 }
 

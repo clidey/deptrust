@@ -10,15 +10,17 @@ import (
 
 func TestCompactCheckOmitsVulnerabilityArrays(t *testing.T) {
 	result := models.CheckResult{
-		Ecosystem:      models.EcosystemNPM,
-		Package:        "vite",
-		Version:        "7.0.0",
-		RiskScore:      80,
-		Classification: "vulnerable",
-		Recommendation: "block",
-		Reason:         "Found known vulnerabilities.",
-		NextAction:     "do_not_install",
-		Summary:        "vite 7.0.0 has known vulnerabilities.",
+		Ecosystem:                  models.EcosystemNPM,
+		Package:                    "vite",
+		Version:                    "7.0.0",
+		RiskScore:                  80,
+		Classification:             "vulnerable",
+		Recommendation:             "block",
+		Reason:                     "Found known vulnerabilities.",
+		NextAction:                 "do_not_install",
+		Summary:                    "vite 7.0.0 has known vulnerabilities.",
+		RegistryVerification:       "unverified",
+		RegistryVerificationReason: "registry timed out",
 		Vulnerabilities: []models.Vulnerability{
 			{
 				ID:             "GHSA-test-1234-5678",
@@ -60,6 +62,9 @@ func TestCompactCheckOmitsVulnerabilityArrays(t *testing.T) {
 	}
 	if !strings.Contains(text, `"highest_severity":"high"`) {
 		t.Fatalf("compact MCP result missing highest severity: %s", text)
+	}
+	if !strings.Contains(text, `"registry_verification":"unverified"`) || !strings.Contains(text, `"registry_verification_reason":"registry timed out"`) {
+		t.Fatalf("compact MCP result missing registry verification: %s", text)
 	}
 	if !strings.Contains(text, `"full_response_command":"deptrust check --json npm vite 7.0.0"`) {
 		t.Fatalf("compact MCP result missing full response command: %s", text)

@@ -62,10 +62,10 @@ func TestIntegrationResolveLiveRegistries(t *testing.T) {
 			if got.Version == "" {
 				t.Fatal("Version is empty")
 			}
-			if got.Latest == "" {
+			if tt.version == models.LatestVersion && got.Latest == "" {
 				t.Fatal("Latest is empty")
 			}
-			if len(got.Versions) == 0 {
+			if tt.version == models.LatestVersion && len(got.Versions) == 0 {
 				t.Fatal("Versions is empty")
 			}
 		})

@@ -91,6 +91,9 @@ func resolveMaven(ctx context.Context, client HTTPClient, query models.Query) (V
 		return VersionInfo{}, fmt.Errorf("maven package %q does not declare a latest version", query.Package)
 	}
 	if _, ok := versionSet[requested]; !ok {
+		if metadataErr != nil {
+			return VersionInfo{}, metadataErr
+		}
 		return VersionInfo{}, VersionNotFoundError{Package: query.Package, Version: requested, Latest: latest}
 	}
 

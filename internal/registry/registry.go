@@ -17,6 +17,7 @@ type VersionInfo struct {
 	Versions             []string              `json:"versions,omitempty"`
 	PublishedAt          *time.Time            `json:"published_at,omitempty"`
 	PublishedAtByVersion map[string]*time.Time `json:"-"`
+	Signals              []models.Signal       `json:"-"`
 }
 
 type Resolver interface {

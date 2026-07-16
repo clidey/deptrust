@@ -89,6 +89,10 @@ The JSON output includes advisory coverage fields:
 - `skipped_providers`: configured providers skipped because the ecosystem is unsupported
 - `advisory_coverage`: `full`, `partial`, `none`, or `error`
 - `advisory_coverage_reason`: short explanation for the coverage value
+- `registry_verification`: `verified` when registry metadata confirmed the version, or `unverified` when an exact-version check continued after a transient registry failure
+- `registry_verification_reason`: the registry error when verification was unavailable
+
+An exact-version check still queries advisory providers when registry verification is temporarily unavailable. That result is always non-installable and never receives an `allow` recommendation. Checks for `latest`, unknown packages, and definitively nonexistent versions still require successful registry resolution.
 
 ## CLI Usage
 
@@ -171,6 +175,7 @@ Example JSON response:
   "skipped_providers": [],
   "advisory_coverage": "full",
   "advisory_coverage_reason": "all configured vulnerability providers were checked",
+  "registry_verification": "verified",
   "vulnerabilities": [
     {
       "id": "GHSA-35jh-r3h4-6jhm",
@@ -391,6 +396,7 @@ Example compact MCP structured output:
   "skipped_providers": [],
   "advisory_coverage": "full",
   "advisory_coverage_reason": "all configured vulnerability providers were checked",
+  "registry_verification": "verified",
   "full_response_command": "deptrust check --json npm vite 7.0.0"
 }
 ```
@@ -447,4 +453,4 @@ which deptrust
 
 Then put that absolute path in the MCP config.
 
-If a package check returns `unknown`, do not treat the package as safe. It usually means deptrust could not get a complete answer from a provider.
+If a package check returns `unknown`, do not treat the package as safe. It means deptrust could not get a complete answer from an advisory provider or could not verify the exact version with its registry.

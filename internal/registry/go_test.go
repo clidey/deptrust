@@ -45,7 +45,7 @@ func TestResolveGoLatest(t *testing.T) {
 			status: http.StatusOK,
 			body:   "v1.9.0\nv1.10.0\n",
 		},
-		"/github.com/gin-gonic/gin/@latest": {
+		"/github.com/gin-gonic/gin/@v/v1.10.0.info": {
 			status: http.StatusOK,
 			body:   `{"Version":"v1.10.0","Time":"2024-05-07T13:00:00Z"}`,
 		},
@@ -68,6 +68,28 @@ func TestResolveGoLatest(t *testing.T) {
 	}
 	if got.PublishedAt == nil {
 		t.Fatal("PublishedAt = nil, want latest timestamp")
+	}
+}
+
+func TestResolveGoPseudoVersionDirectly(t *testing.T) {
+	pseudoVersion := "v0.48.1-0.20260715233119-591dfa620de7"
+	client := fakeHTTPClient{responses: map[string]fakeResponse{
+		"/golang.org/x/tools/@v/" + pseudoVersion + ".info": {
+			status: http.StatusOK,
+			body:   `{"Version":"v0.48.1-0.20260715233119-591dfa620de7","Time":"2026-07-15T23:31:19Z"}`,
+		},
+	}}
+
+	got, err := resolveGo(context.Background(), client, models.Query{
+		Ecosystem: models.EcosystemGo,
+		Package:   "golang.org/x/tools",
+		Version:   pseudoVersion,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Version != pseudoVersion {
+		t.Fatalf("Version = %q, want %q", got.Version, pseudoVersion)
 	}
 }
 

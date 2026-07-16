@@ -31,6 +31,8 @@ type compactCheckResult struct {
 	SkippedProviders           []models.SkippedProvider `json:"skipped_providers,omitempty"`
 	AdvisoryCoverage           string                   `json:"advisory_coverage"`
 	AdvisoryCoverageReason     string                   `json:"advisory_coverage_reason,omitempty"`
+	RegistryVerification       string                   `json:"registry_verification"`
+	RegistryVerificationReason string                   `json:"registry_verification_reason,omitempty"`
 	ResolvedFromVersionRequest string                   `json:"resolved_from_version_request,omitempty"`
 	FullResponseCommand        string                   `json:"full_response_command,omitempty"`
 }
@@ -101,6 +103,8 @@ func compactCheck(result models.CheckResult) compactCheckResult {
 		SkippedProviders:           result.SkippedProviders,
 		AdvisoryCoverage:           result.AdvisoryCoverage,
 		AdvisoryCoverageReason:     result.AdvisoryCoverageReason,
+		RegistryVerification:       result.RegistryVerification,
+		RegistryVerificationReason: result.RegistryVerificationReason,
 		ResolvedFromVersionRequest: result.ResolvedFromVersionRequest,
 		FullResponseCommand:        command("check", string(result.Ecosystem), result.Package, result.Version),
 	}

@@ -27,7 +27,7 @@ const serverInstructions = "Use this server to vet dependencies for known vulner
 	"- suggest_safe_version: when a version is blocked or unknown, find the newest version with an allow recommendation.\n" +
 	"- compare_versions: when moving between two known versions, confirm the target actually improves risk.\n\n" +
 	"Recommendations: 'block' = do not install that version; 'review' = ask the user or pick a safer version; " +
-	"'allow' = no blocking known vulnerability found; 'unknown' = provider failure or incomplete assessment, do NOT treat as safe. " +
+	"'allow' = no blocking known vulnerability found; 'unknown' = provider failure, unavailable registry verification, or incomplete assessment, do NOT treat as safe. " +
 	"When reporting back, include the package, version, recommendation, and the highest-severity advisory IDs found. " +
 	"Boundaries: this checks known public advisories and registry metadata; it does not prove a package is safe, " +
 	"download tarballs, or detect all malware."
