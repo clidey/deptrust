@@ -10,6 +10,10 @@ permissions:
   contents: write
   id-token: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
     name: Build and release
@@ -123,9 +127,6 @@ jobs:
             dist/checksums.txt
             dist/release-notes.md
 
-      - name: Publish npm package
-        run: npm publish --access public
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
         with:
@@ -137,6 +138,9 @@ jobs:
             dist/*.zip
             dist/checksums.txt
           fail_on_unmatched_files: true
+
+      - name: Publish npm package
+        run: npm publish --access public
 
       - name: Update Homebrew tap
         env:
