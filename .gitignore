@@ -31,6 +31,10 @@ go.work.sum
 # Local sandbox/tool caches
 .cache/
 
+# Nix build results
+/result
+/result-*
+
 # Editor/IDE
 .idea/
 .vscode/

@@ -1,0 +1,56 @@
+name: Nix flake
+
+# Validates the flake (flake.nix). Nix is a side concern, so this job is
+# path-filtered to the flake files — it fires only when they change.
+#
+# Three steps, in order of what they catch:
+#   1. nix flake check --all-systems  — every system's outputs evaluate
+#   2. nix build .#default            — fetchurl + autoPatchelf + install
+#      layout actually realises for the runner's system.
+#   3. nix run .#default -- --version — the patched binary actually execs.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "flake.nix"
+      - "flake.lock"
+      - "**/*.nix"
+      - ".github/workflows/nix.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "flake.nix"
+      - "flake.lock"
+      - "**/*.nix"
+      - ".github/workflows/nix.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nix-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: nix flake check
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v16
+
+      - name: nix flake check --all-systems
+        run: nix flake check --all-systems --print-build-logs
+
+      - name: nix build .#default
+        run: nix build .#default --print-build-logs
+
+      - name: nix run .#default -- version
+        run: nix run .#default -- version
