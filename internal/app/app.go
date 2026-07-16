@@ -4,13 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/clidey/deptrust/internal/github"
+	"github.com/clidey/deptrust/internal/httpclient"
 	"github.com/clidey/deptrust/internal/models"
 	"github.com/clidey/deptrust/internal/osv"
 	"github.com/clidey/deptrust/internal/registry"
@@ -42,7 +42,7 @@ type vulnerabilityQueryResult struct {
 }
 
 func New() App {
-	client := &http.Client{Timeout: 15 * time.Second}
+	client := httpclient.New()
 	return App{
 		registry: registry.New(client),
 		providers: []vulnerabilityClient{

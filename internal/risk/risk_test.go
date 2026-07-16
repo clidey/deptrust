@@ -59,6 +59,21 @@ func TestScoreProviderFailureReturnsUnknown(t *testing.T) {
 	}
 }
 
+func TestScoreProviderFailurePreventsAllowWithLowSeverityFinding(t *testing.T) {
+	got := Score(
+		pkg(),
+		[]models.Vulnerability{{Severity: "low"}},
+		nil,
+		[]models.ProviderError{{Provider: "GitHub Advisory DB", Message: "HTTP 429"}},
+	)
+	if got.Recommendation != RecommendationUnknown {
+		t.Fatalf("recommendation = %q, want %q", got.Recommendation, RecommendationUnknown)
+	}
+	if got.SafeToUse {
+		t.Fatal("SafeToUse = true, want false")
+	}
+}
+
 func TestScoreRecentReleaseSignalReviews(t *testing.T) {
 	got := Score(pkg(), nil, []models.Signal{{Severity: "medium", Score: 30}}, nil)
 	if got.Recommendation != RecommendationReview {

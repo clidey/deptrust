@@ -94,6 +94,8 @@ The JSON output includes advisory coverage fields:
 
 An exact-version check still queries advisory providers when registry verification is temporarily unavailable. That result is always non-installable and never receives an `allow` recommendation. Checks for `latest`, unknown packages, and definitively nonexistent versions still require successful registry resolution.
 
+HTTP requests retry `429`, `502`, `503`, and `504` responses up to three total attempts. Retries use short exponential delays and honor `Retry-After` values up to two seconds; longer server-requested waits fail fast so the CLI does not hang. Exhausted advisory retries make the result incomplete and prevent an `allow` recommendation.
+
 ## CLI Usage
 
 Check an exact version:

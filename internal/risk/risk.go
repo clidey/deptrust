@@ -75,13 +75,21 @@ func Score(pkg models.PackageVersion, vulns []models.Vulnerability, signals []mo
 	case maxScore <= 20:
 		recommendation = RecommendationAllow
 	}
+	providerCoverageIncomplete := len(providerErrors) > 0 && recommendation == RecommendationAllow
+	if providerCoverageIncomplete {
+		recommendation = RecommendationUnknown
+	}
+	summary := assessmentSummary(pkg, len(vulns), len(signals), maxSeverity, recommendation)
+	if providerCoverageIncomplete {
+		summary = fmt.Sprintf("Could not fully assess %s %s because vulnerability providers returned errors. Partial findings must not be treated as safe.", pkg.Package, pkg.Version)
+	}
 
 	return Assessment{
 		RiskScore:      maxScore,
 		Classification: classificationFor(vulns, signals),
 		Recommendation: recommendation,
 		SafeToUse:      recommendation == RecommendationAllow,
-		Summary:        assessmentSummary(pkg, len(vulns), len(signals), maxSeverity, recommendation),
+		Summary:        summary,
 	}
 }
 
