@@ -78,11 +78,22 @@ jobs:
           registry-url: https://registry.npmjs.org
           package-manager-cache: false
 
+      - name: Install Nix
+        uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
+
       - name: Test
         run: go test ./...
 
       - name: Build release archives
         run: ./scripts/build-release.sh "${{ steps.release.outputs.tag }}" "${GITHUB_SHA::7}" "${{ steps.release.outputs.date }}"
+
+      - name: Generate and evaluate Nix release
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/update-nix-flake.mjs "${{ steps.release.outputs.tag }}" dist/checksums.txt
+          nix flake check --all-systems --no-build --print-build-logs
+          git diff --check -- flake.nix
 
       - name: Generate release notes
         run: ./scripts/release-notes.sh "${{ steps.release.outputs.tag }}" dist/release-notes.md
@@ -162,7 +173,7 @@ jobs:
           git -C "$tap_dir" commit -m "deptrust $TAG"
           git -C "$tap_dir" push origin HEAD
 
-      - name: Commit stamped source version
+      - name: Commit release metadata and validated Nix flake
         shell: bash
         run: |
           set -euo pipefail
@@ -173,6 +184,11 @@ jobs:
           cp package.json "$tmp_dir/package.json"
           cp .agents/skills/deptrust-package-check/SKILL.md "$tmp_dir/skill/SKILL.md"
 
+          # The release build stamped these tracked files in the tag checkout.
+          # Restore them before switching to the latest default branch; the
+          # stamped copies above are applied again after the checkout.
+          git restore --source=HEAD --worktree package.json .agents/skills/deptrust-package-check/SKILL.md flake.nix
+
           git fetch origin "$default_branch"
           git checkout "$default_branch"
           git pull --ff-only origin "$default_branch"
@@ -180,12 +196,23 @@ jobs:
           cp "$tmp_dir/package.json" package.json
           cp "$tmp_dir/skill/SKILL.md" .agents/skills/deptrust-package-check/SKILL.md
 
+          node scripts/update-nix-flake.mjs "${{ steps.release.outputs.tag }}" dist/checksums.txt
+          nix flake check --all-systems --print-build-logs
+          nix build .#default --print-build-logs
+          actual="$(nix run .#default -- version | head -n 1)"
+          expected="deptrust ${{ steps.release.outputs.tag }}"
+          if [[ "$actual" != "$expected" ]]; then
+            echo "Version mismatch: got '$actual', expected '$expected'" >&2
+            exit 1
+          fi
+          git diff --check
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json .agents/skills/deptrust-package-check/SKILL.md
+          git add package.json .agents/skills/deptrust-package-check/SKILL.md flake.nix
 
           if git diff --cached --quiet; then
-            echo "Source version files already match ${{ steps.release.outputs.tag }}"
+            echo "Source version files and Nix flake already match ${{ steps.release.outputs.tag }}"
             exit 0
           fi
 

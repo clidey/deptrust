@@ -31,7 +31,7 @@
     deptrustFor = system: let
       pkgs = nixpkgs.legacyPackages.${system};
       asset = assets.${system};
-    in pkgs.stdenv.mkDerivation {
+    in pkgs.stdenvNoCC.mkDerivation {
       pname = "deptrust";
       inherit version;
 
@@ -40,11 +40,9 @@
         sha256 = asset.sha256;
       };
 
-      nativeBuildInputs = pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.autoPatchelfHook ];
-      buildInputs = pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.stdenv.cc.cc.lib ];
-
       dontConfigure = true;
       dontBuild = true;
+      dontPatchELF = true;
 
       installPhase = ''
         runHook preInstall
@@ -71,15 +69,13 @@
 
     apps = forAllSystems (system: let
       deptrustPkg = deptrustFor system;
-    in {
+    in rec {
       deptrust = {
         type = "app";
         program = "${deptrustPkg}/bin/deptrust";
+        meta = deptrustPkg.meta;
       };
-      default = {
-        type = "app";
-        program = "${deptrustPkg}/bin/deptrust";
-      };
+      default = deptrust;
     });
   };
 }

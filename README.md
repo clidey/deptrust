@@ -292,11 +292,13 @@ nix run github:clidey/deptrust
 nix profile install github:clidey/deptrust
 ```
 
-The flake tracks the default branch and is auto-bumped to the latest release by a
-daily [workflow](.github/workflows/nix-release.yml), so `github:clidey/deptrust`
-always serves the current release. (Release tags are cut before the bump lands,
-so `github:clidey/deptrust/vX.Y.Z` is not a valid pin — use the
-nixpkgs package or a specific commit SHA if you need reproducibility.)
+The normal [release workflow](.github/workflows/release.yml) generates the Nix
+hashes from the same archives it publishes, evaluates the flake before
+publishing, then builds and runs it against the published assets before updating
+the default branch. `github:clidey/deptrust` may briefly lag while that workflow
+is running. Release tags point to the source commit from before the generated
+flake update and may still reference the previous binary; pin a commit whose
+`flake.nix` contains the version you need when reproducibility matters.
 
 ### Devbox
 
@@ -312,6 +314,10 @@ devbox shell
 # Build the project
 devbox run build
 ```
+
+`devbox.json` constrains the toolchain version and the committed `devbox.lock`
+pins the exact package versions and nixpkgs revisions. Run `devbox update` when
+you intentionally want to refresh those pins.
 
 Or install Devbox via Homebrew:
 

@@ -5,9 +5,9 @@ name: Nix flake
 #
 # Three steps, in order of what they catch:
 #   1. nix flake check --all-systems  — every system's outputs evaluate
-#   2. nix build .#default            — fetchurl + autoPatchelf + install
-#      layout actually realises for the runner's system.
-#   3. nix run .#default -- --version — the patched binary actually execs.
+#   2. nix build .#default            — fetchurl + install layout actually
+#      realises for the runner's system.
+#   3. nix run .#default -- version   — the packaged binary actually execs.
 
 on:
   push:
@@ -16,14 +16,18 @@ on:
       - "flake.nix"
       - "flake.lock"
       - "**/*.nix"
+      - "scripts/update-nix-flake.mjs"
       - ".github/workflows/nix.yml"
+      - ".github/workflows/release.yml"
   pull_request:
     branches: [main]
     paths:
       - "flake.nix"
       - "flake.lock"
       - "**/*.nix"
+      - "scripts/update-nix-flake.mjs"
       - ".github/workflows/nix.yml"
+      - ".github/workflows/release.yml"
 
 permissions:
   contents: read
@@ -39,12 +43,12 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
 
       - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v16
+        uses: DeterminateSystems/nix-installer-action@e50d5f73bfe71c2dd0aa4218de8f4afa59f8f81d # v16
 
       - name: nix flake check --all-systems
         run: nix flake check --all-systems --print-build-logs
