@@ -4,24 +4,24 @@
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
 
   outputs = { self, nixpkgs }: let
-    version = "0.9.0";
+    version = "0.10.0";
 
     assets = {
       "x86_64-linux" = {
         file = "deptrust_v${version}_linux_amd64.tar.gz";
-        sha256 = "sha256-qL/N68QDrzGB7wLsy0X3sk4bpgzKXexNKZQ/bEvZ0RA=";
+        sha256 = "sha256-zFH5Nsr3Z/LcJiFWmAYSxkS4Y4FMqpSdJJ9S0g560jU=";
       };
       "aarch64-linux" = {
         file = "deptrust_v${version}_linux_arm64.tar.gz";
-        sha256 = "sha256-g6f5GH37PLP0A1zWb5mzlSVGk963ZkJztXkW0ZU8+iY=";
+        sha256 = "sha256-ERbBzOmS6KmKtPEK4+I3jQvaUhAEaVRrge9W1nDt9iU=";
       };
       "x86_64-darwin" = {
         file = "deptrust_v${version}_darwin_amd64.tar.gz";
-        sha256 = "sha256-vRch3/CkvkgKEB8sqi2WK4MlL/+ucDI9DgA9hqVi4VU=";
+        sha256 = "sha256-uRQhX0OZz1PELO9FmfB0cvyBaJtvv5abryRj7eYoLh4=";
       };
       "aarch64-darwin" = {
         file = "deptrust_v${version}_darwin_arm64.tar.gz";
-        sha256 = "sha256-yvSrmO55FFTyQAFDTyFAri4Xcp8Z/dUY7UYXtF6wjag=";
+        sha256 = "sha256-K2maPpcUL/DMJ3NncXGaxg+yG8arZLJmGlCJjoVxsnM=";
       };
     };
 
