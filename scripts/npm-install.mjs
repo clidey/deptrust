@@ -455,36 +455,15 @@ function sameSkill(source, target) {
 }
 
 function maybeRegisterMCP(options, installPath) {
-  if (options.codexMCP) {
-    if (commandExists("codex")) {
-      const status = mcpServerStatus("codex", installPath);
-      if (status === "missing") {
-        run("codex", ["mcp", "add", "deptrust", "--", installPath, "mcp"]);
-        console.log("Connected deptrust to Codex.");
-      } else if (status === "changed") {
-        runAllowFailure("codex", ["mcp", "remove", "deptrust"]);
-        run("codex", ["mcp", "add", "deptrust", "--", installPath, "mcp"]);
-        console.log("Updated the deptrust Codex MCP configuration.");
-      }
-    } else {
-      console.warn("Couldn't find the codex command, so we skipped the Codex setup. Install Codex first if you'd like it connected.");
+  if (options.codexMCP || options.claudeCodeMCP) {
+    const args = ["setup"];
+    if (options.codexMCP) {
+      args.push("--codex-mcp");
     }
-  }
-
-  if (options.claudeCodeMCP) {
-    if (commandExists("claude")) {
-      const status = mcpServerStatus("claude", installPath);
-      if (status === "missing") {
-        run("claude", ["mcp", "add", "--transport", "stdio", "--scope", "user", "deptrust", "--", installPath, "mcp"]);
-        console.log("Connected deptrust to Claude Code.");
-      } else if (status === "changed") {
-        runAllowFailure("claude", ["mcp", "remove", "deptrust", "--scope", "user"]);
-        run("claude", ["mcp", "add", "--transport", "stdio", "--scope", "user", "deptrust", "--", installPath, "mcp"]);
-        console.log("Updated the deptrust Claude Code MCP configuration.");
-      }
-    } else {
-      console.warn("Couldn't find the claude command, so we skipped the Claude Code setup. Install Claude Code first if you'd like it connected.");
+    if (options.claudeCodeMCP) {
+      args.push("--claude-code-mcp");
     }
+    run(installPath, args);
   }
 }
 
@@ -656,28 +635,6 @@ function mcpServerRegistered(command, args) {
     return false;
   }
   return result.stdout.split(/\r?\n/).some((line) => /(^|[^\w-])deptrust([^\w-]|$)/.test(line));
-}
-
-function mcpServerStatus(command, installPath) {
-  if (!mcpServerRegistered(command, ["mcp", "list"])) {
-    return "missing";
-  }
-
-  // `get` is supported by the current Codex and Claude CLIs. If an older CLI
-  // cannot describe an existing server, leave it alone rather than requiring
-  // a destructive remove/re-add that the installer cannot verify.
-  const result = spawnSync(command, ["mcp", "get", "deptrust"], { encoding: "utf8" });
-  if (result.status !== 0 || typeof result.stdout !== "string") {
-    return "unchanged";
-  }
-  const commandMatch = result.stdout.match(/^\s*command:\s*(.+)$/im);
-  const argsMatch = result.stdout.match(/^\s*args:\s*(.+)$/im);
-  if (!commandMatch || !argsMatch) {
-    return "unchanged";
-  }
-  const configuredCommand = commandMatch[1].trim();
-  const configuredArgs = argsMatch[1].trim();
-  return configuredCommand === installPath && configuredArgs === "mcp" ? "unchanged" : "changed";
 }
 
 function commandExists(command) {

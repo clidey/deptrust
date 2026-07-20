@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -8,6 +9,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/clidey/deptrust/internal/app"
@@ -40,6 +43,8 @@ func run(args []string, stdout, stderr io.Writer) error {
 		return runCompare(context.Background(), service, args[1:], stdout)
 	case "mcp":
 		return mcp.Serve(context.Background(), service, os.Stdin, stdout)
+	case "setup":
+		return runSetup(args[1:], os.Stdin, stdout, stderr)
 	case "hook":
 		return runHook(context.Background(), service, args[1:], os.Stdin, stdout)
 	case "version":
@@ -51,6 +56,110 @@ func run(args []string, stdout, stderr io.Writer) error {
 	default:
 		return fmt.Errorf("unknown command %q", args[0])
 	}
+}
+
+func runSetup(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
+	var codex, claude bool
+	for _, arg := range args {
+		switch arg {
+		case "--codex-mcp":
+			codex = true
+		case "--claude-code-mcp":
+			claude = true
+		default:
+			return errors.New("usage: deptrust setup [--codex-mcp] [--claude-code-mcp]")
+		}
+	}
+	guided := !codex && !claude
+
+	executable := os.Args[0]
+	if !filepath.IsAbs(executable) {
+		var err error
+		executable, err = exec.LookPath(executable)
+		if err != nil {
+			return fmt.Errorf("resolve deptrust executable: %w", err)
+		}
+	}
+	executable, err := filepath.Abs(executable)
+	if err != nil {
+		return fmt.Errorf("resolve deptrust executable: %w", err)
+	}
+
+	reader := bufio.NewReader(stdin)
+	fmt.Fprintf(stdout, "deptrust guided setup\n\nUsing binary: %s\n\n", executable)
+
+	if commandAvailable("codex") {
+		if guided {
+			codex, err = promptYesNo(reader, stdout, "Register deptrust with Codex MCP?", true)
+			if err != nil {
+				return err
+			}
+		}
+		if codex {
+			if err := configureMCP("codex", []string{"mcp", "remove", "deptrust"}, []string{"mcp", "add", "deptrust", "--", executable, "mcp"}, stdout, stderr); err != nil {
+				return err
+			}
+		}
+	} else {
+		fmt.Fprintln(stdout, "Codex CLI not found; skipped Codex MCP setup.")
+	}
+
+	if commandAvailable("claude") {
+		if guided {
+			claude, err = promptYesNo(reader, stdout, "Register deptrust with Claude Code MCP?", true)
+			if err != nil {
+				return err
+			}
+		}
+		if claude {
+			if err := configureMCP("claude", []string{"mcp", "remove", "deptrust", "--scope", "user"}, []string{"mcp", "add", "--transport", "stdio", "--scope", "user", "deptrust", "--", executable, "mcp"}, stdout, stderr); err != nil {
+				return err
+			}
+		}
+	} else {
+		fmt.Fprintln(stdout, "Claude CLI not found; skipped Claude Code MCP setup.")
+	}
+
+	fmt.Fprintln(stdout, "Setup complete.")
+	return nil
+}
+
+func promptYesNo(reader *bufio.Reader, stdout io.Writer, question string, defaultYes bool) (bool, error) {
+	suffix := "[Y/n]"
+	if !defaultYes {
+		suffix = "[y/N]"
+	}
+	fmt.Fprintf(stdout, "%s %s ", question, suffix)
+	answer, err := reader.ReadString('\n')
+	if err != nil && len(answer) == 0 {
+		return false, err
+	}
+	answer = strings.ToLower(strings.TrimSpace(answer))
+	if answer == "" {
+		return defaultYes, nil
+	}
+	return answer == "y" || answer == "yes", nil
+}
+
+func configureMCP(command string, removeArgs, addArgs []string, stdout, stderr io.Writer) error {
+	remove := exec.Command(command, removeArgs...)
+	remove.Stdout = io.Discard
+	remove.Stderr = io.Discard
+	_ = remove.Run()
+
+	add := exec.Command(command, addArgs...)
+	add.Stdout = stdout
+	add.Stderr = stderr
+	if err := add.Run(); err != nil {
+		return fmt.Errorf("configure %s MCP: %w", command, err)
+	}
+	fmt.Fprintf(stdout, "Connected deptrust to %s.\n", command)
+	return nil
+}
+
+func commandAvailable(command string) bool {
+	_, err := exec.LookPath(command)
+	return err == nil
 }
 
 func runHook(ctx context.Context, service app.App, args []string, stdin io.Reader, stdout io.Writer) error {
@@ -169,6 +278,7 @@ Usage:
   deptrust suggest [--json] <ecosystem> <package>
   deptrust compare [--json] <ecosystem> <package> <from-version> <to-version>
   deptrust mcp
+  deptrust setup [--codex-mcp] [--claude-code-mcp]
   deptrust hook tool
   deptrust version
 

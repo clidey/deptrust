@@ -288,6 +288,12 @@ brew install deptrust
 brew upgrade deptrust
 ```
 
+Homebrew prints a reminder after installation. To run the guided Codex and Claude Code MCP setup using the Homebrew binary itself:
+
+```bash
+deptrust setup
+```
+
 Go users can install directly:
 
 ```bash

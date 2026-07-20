@@ -102,30 +102,15 @@ if $install_codex_skill; then
   "$repo_root/scripts/install-codex-skill.sh"
 fi
 
-mcp_server_registered() {
-  "$@" mcp list 2>/dev/null | grep -Eq '(^|[^[:alnum:]_-])deptrust([^[:alnum:]_-]|$)'
-}
-
+setup_args=()
 if $install_codex_mcp; then
-  if ! command -v codex >/dev/null 2>&1; then
-    echo "Couldn't find the codex command, so we skipped the Codex setup. Install Codex first if you'd like it connected." >&2
-  elif mcp_server_registered codex; then
-    echo "deptrust is already set up in Codex, so we left it as-is. To replace it, run 'codex mcp remove deptrust' and try again." >&2
-  else
-    codex mcp add deptrust -- "$install_path" mcp
-    echo "Connected deptrust to Codex."
-  fi
+  setup_args+=(--codex-mcp)
 fi
-
 if $install_claude_code_mcp; then
-  if ! command -v claude >/dev/null 2>&1; then
-    echo "Couldn't find the claude command, so we skipped the Claude Code setup. Install Claude Code first if you'd like it connected." >&2
-  elif mcp_server_registered claude; then
-    echo "deptrust is already set up in Claude Code, so we left it as-is. To replace it, run 'claude mcp remove deptrust' and try again." >&2
-  else
-    claude mcp add --transport stdio --scope user deptrust -- "$install_path" mcp
-    echo "Connected deptrust to Claude Code."
-  fi
+  setup_args+=(--claude-code-mcp)
+fi
+if [[ ${#setup_args[@]} -gt 0 ]]; then
+  "$install_path" setup "${setup_args[@]}"
 fi
 
 if $run_check; then

@@ -35,6 +35,13 @@ class Deptrust < Formula
     bin.install "deptrust"
   end
 
+  def caveats
+    <<~EOS
+      To configure Codex and Claude Code with the guided setup, run:
+        deptrust setup
+    EOS
+  end
+
   test do
     # The release binary stamps its version as the git tag, e.g. "deptrust v0.6.0".
     assert_match "deptrust v#{version}", shell_output("#{bin}/deptrust version")
