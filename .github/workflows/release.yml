@@ -17,7 +17,9 @@ concurrency:
 jobs:
   release:
     name: Build and release
-    runs-on: ubuntu-latest
+    # Darwin artifacts must be signed by Apple's codesign on macOS. macOS 26
+    # rejects the ad-hoc signature emitted by a Linux cross-build at launch.
+    runs-on: macos-14
 
     steps:
       - name: Checkout

@@ -89,6 +89,11 @@ date="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 ldflags="-s -w -X github.com/clidey/deptrust/internal/buildinfo.Version=$version -X github.com/clidey/deptrust/internal/buildinfo.Commit=$commit -X github.com/clidey/deptrust/internal/buildinfo.Date=$date"
 (cd "$repo_root" && go build -ldflags "$ldflags" -o "$tmp_bin" ./cmd/deptrust)
 
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  codesign --force --sign - "$tmp_bin"
+  codesign --verify --strict "$tmp_bin"
+fi
+
 install_path="$bin_dir/deptrust"
 install -m 0755 "$tmp_bin" "$install_path"
 echo "Installed deptrust to $install_path."

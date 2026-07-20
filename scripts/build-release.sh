@@ -50,6 +50,17 @@ for target in "${targets[@]}"; do
       ./cmd/deptrust
   )
 
+  if [[ "$goos" == "darwin" ]]; then
+    if ! command -v codesign >/dev/null 2>&1; then
+      echo "codesign is required to produce runnable macOS release binaries" >&2
+      exit 1
+    fi
+    # Go embeds an ad-hoc signature in Mach-O binaries. Re-sign on macOS so
+    # the kernel accepts the pages after the cross-platform release build.
+    codesign --force --sign - "$build_dir/$binary"
+    codesign --verify --strict "$build_dir/$binary"
+  fi
+
   cp "$repo_root/README.md" "$build_dir/README.md"
   cp "$repo_root/LICENSE" "$build_dir/LICENSE"
 

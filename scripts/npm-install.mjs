@@ -170,6 +170,13 @@ async function installBinary(options) {
   if (!existsSync(source)) {
     throw new Error(`release archive did not contain ${binaryName}`);
   }
+  if (process.platform === "darwin") {
+    // Re-sign downloaded Mach-O files locally. This protects users installing
+    // an older release whose CI-built Darwin signature macOS may reject.
+    run("codesign", ["--force", "--sign", "-", source]);
+    run("codesign", ["--verify", "--strict", source]);
+  }
+
   copyFileSync(source, installPath);
   chmodSync(installPath, 0o755);
 
