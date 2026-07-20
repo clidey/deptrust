@@ -265,6 +265,8 @@ pnpx @clidey/deptrust@latest install
 
 The default installer is guided. It installs the binary, asks which agent integrations to configure, prints the user-level destinations before changing anything, and asks for confirmation. The guided installer defaults to enabling MCP, the skill fallback, and dependency safety hooks for Codex and Claude Code. Add `--yes` for non-interactive binary-only installs, or pass explicit integration flags.
 
+Rerunning the installer is safe. It silently leaves unchanged MCP, skill, and hook configuration alone. If an integration points at an old deptrust binary or its managed configuration has changed, the installer updates it automatically; users do not need to manually remove and re-add MCP servers. Customized skills are backed up before replacement.
+
 To remove the user-level binary, skill, and MCP entries:
 
 ```bash

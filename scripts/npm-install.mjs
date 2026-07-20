@@ -424,7 +424,10 @@ async function maybeInstallSkill(options) {
   if (!existsSync(join(source, "SKILL.md"))) {
     throw new Error("deptrust skill was not included in the npm package");
   }
-  if (existsSync(target) && !sameSkill(source, target)) {
+  if (existsSync(target) && sameSkill(source, target)) {
+    return;
+  }
+  if (existsSync(target)) {
     const backup = `${target}.bak-${Date.now()}`;
     renameSync(target, backup);
     console.warn(`Found a customized skill at ${target}, so we saved it to ${backup} before installing ours.`);
@@ -433,7 +436,7 @@ async function maybeInstallSkill(options) {
   }
   mkdirSync(dirname(target), { recursive: true });
   cpSync(source, target, { recursive: true });
-  console.log(`Installed the deptrust-package-check skill to ${target}.`);
+  console.log(`Updated the deptrust-package-check skill at ${target}.`);
 }
 
 function sameSkill(source, target) {
@@ -447,11 +450,14 @@ function sameSkill(source, target) {
 function maybeRegisterMCP(options, installPath) {
   if (options.codexMCP) {
     if (commandExists("codex")) {
-      if (mcpServerRegistered("codex", ["mcp", "list"])) {
-        console.warn("deptrust is already set up in Codex, so we left it as-is. To replace it, run `codex mcp remove deptrust` and try again.");
-      } else {
+      const status = mcpServerStatus("codex", installPath);
+      if (status === "missing") {
         run("codex", ["mcp", "add", "deptrust", "--", installPath, "mcp"]);
         console.log("Connected deptrust to Codex.");
+      } else if (status === "changed") {
+        runAllowFailure("codex", ["mcp", "remove", "deptrust"]);
+        run("codex", ["mcp", "add", "deptrust", "--", installPath, "mcp"]);
+        console.log("Updated the deptrust Codex MCP configuration.");
       }
     } else {
       console.warn("Couldn't find the codex command, so we skipped the Codex setup. Install Codex first if you'd like it connected.");
@@ -460,11 +466,14 @@ function maybeRegisterMCP(options, installPath) {
 
   if (options.claudeCodeMCP) {
     if (commandExists("claude")) {
-      if (mcpServerRegistered("claude", ["mcp", "list"])) {
-        console.warn("deptrust is already set up in Claude Code, so we left it as-is. To replace it, run `claude mcp remove deptrust` and try again.");
-      } else {
+      const status = mcpServerStatus("claude", installPath);
+      if (status === "missing") {
         run("claude", ["mcp", "add", "--transport", "stdio", "--scope", "user", "deptrust", "--", installPath, "mcp"]);
         console.log("Connected deptrust to Claude Code.");
+      } else if (status === "changed") {
+        runAllowFailure("claude", ["mcp", "remove", "deptrust", "--scope", "user"]);
+        run("claude", ["mcp", "add", "--transport", "stdio", "--scope", "user", "deptrust", "--", installPath, "mcp"]);
+        console.log("Updated the deptrust Claude Code MCP configuration.");
       }
     } else {
       console.warn("Couldn't find the claude command, so we skipped the Claude Code setup. Install Claude Code first if you'd like it connected.");
@@ -484,8 +493,9 @@ function installCodexHook(installPath) {
   const hooksPath = codexHooksPath();
   const config = readJSONFile(hooksPath);
   config.hooks ||= {};
-  config.hooks.PreToolUse = removeDeptrustHookEntries(config.hooks.PreToolUse || []);
-  config.hooks.PreToolUse.push({
+  const current = config.hooks.PreToolUse || [];
+  const next = removeDeptrustHookEntries(current);
+  next.push({
     matcher: "Bash|apply_patch|Edit|Write|MultiEdit",
     hooks: [
       {
@@ -495,16 +505,21 @@ function installCodexHook(installPath) {
       },
     ],
   });
+  if (JSON.stringify(current) === JSON.stringify(next)) {
+    return;
+  }
+  config.hooks.PreToolUse = next;
   writeJSONFile(hooksPath, config);
-  console.log(`Installed the deptrust Codex shell hook in ${hooksPath}.`);
+  console.log(`Updated the deptrust Codex shell hook in ${hooksPath}.`);
 }
 
 function installClaudeHook(installPath) {
   const settingsPath = claudeSettingsPath();
   const settings = readJSONFile(settingsPath);
   settings.hooks ||= {};
-  settings.hooks.PreToolUse = removeDeptrustHookEntries(settings.hooks.PreToolUse || []);
-  settings.hooks.PreToolUse.push({
+  const current = settings.hooks.PreToolUse || [];
+  const next = removeDeptrustHookEntries(current);
+  next.push({
     matcher: "Bash|Edit|Write|MultiEdit",
     hooks: [
       {
@@ -514,8 +529,12 @@ function installClaudeHook(installPath) {
       },
     ],
   });
+  if (JSON.stringify(current) === JSON.stringify(next)) {
+    return;
+  }
+  settings.hooks.PreToolUse = next;
   writeJSONFile(settingsPath, settings);
-  console.log(`Installed the deptrust Claude Code shell hook in ${settingsPath}.`);
+  console.log(`Updated the deptrust Claude Code shell hook in ${settingsPath}.`);
 }
 
 function removeCodexHook() {
@@ -630,6 +649,28 @@ function mcpServerRegistered(command, args) {
     return false;
   }
   return result.stdout.split(/\r?\n/).some((line) => /(^|[^\w-])deptrust([^\w-]|$)/.test(line));
+}
+
+function mcpServerStatus(command, installPath) {
+  if (!mcpServerRegistered(command, ["mcp", "list"])) {
+    return "missing";
+  }
+
+  // `get` is supported by the current Codex and Claude CLIs. If an older CLI
+  // cannot describe an existing server, leave it alone rather than requiring
+  // a destructive remove/re-add that the installer cannot verify.
+  const result = spawnSync(command, ["mcp", "get", "deptrust"], { encoding: "utf8" });
+  if (result.status !== 0 || typeof result.stdout !== "string") {
+    return "unchanged";
+  }
+  const commandMatch = result.stdout.match(/^\s*command:\s*(.+)$/im);
+  const argsMatch = result.stdout.match(/^\s*args:\s*(.+)$/im);
+  if (!commandMatch || !argsMatch) {
+    return "unchanged";
+  }
+  const configuredCommand = commandMatch[1].trim();
+  const configuredArgs = argsMatch[1].trim();
+  return configuredCommand === installPath && configuredArgs === "mcp" ? "unchanged" : "changed";
 }
 
 function commandExists(command) {
