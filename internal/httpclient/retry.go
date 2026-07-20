@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/clidey/deptrust/internal/githubauth"
 )
 
 const (
@@ -22,9 +24,13 @@ type retryTransport struct {
 }
 
 func New() *http.Client {
+	return NewWithProvider(githubauth.NewProvider())
+}
+
+func NewWithProvider(provider *githubauth.Provider) *http.Client {
 	return &http.Client{
 		Transport: &retryTransport{
-			base:  http.DefaultTransport,
+			base:  githubauth.NewTransport(http.DefaultTransport, provider),
 			now:   time.Now,
 			sleep: sleepContext,
 		},

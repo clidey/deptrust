@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/clidey/deptrust/internal/github"
+	"github.com/clidey/deptrust/internal/githubauth"
 	"github.com/clidey/deptrust/internal/httpclient"
 	"github.com/clidey/deptrust/internal/models"
 	"github.com/clidey/deptrust/internal/osv"
@@ -42,12 +43,13 @@ type vulnerabilityQueryResult struct {
 }
 
 func New() App {
-	client := httpclient.New()
+	provider := githubauth.NewProvider()
+	client := httpclient.NewWithProvider(provider)
 	return App{
 		registry: registry.New(client),
 		providers: []vulnerabilityClient{
 			osv.New(client),
-			github.New(client),
+			github.NewWithProvider(client, provider),
 		},
 		now: time.Now,
 	}
@@ -112,7 +114,7 @@ func (a App) checkResolved(ctx context.Context, resolved registry.VersionInfo) m
 		Classification:            assessment.Classification,
 		Recommendation:            assessment.Recommendation,
 		Reason:                    decisionReason(assessment.Recommendation, vulns, signals, providerErrors),
-		NextAction:                nextAction(assessment.Recommendation, len(vulns), signals, len(providerErrors)),
+		NextAction:                nextAction(assessment.Recommendation, len(vulns), signals, providerErrors),
 		Summary:                   assessment.Summary,
 		Signals:                   signals,
 		Vulnerabilities:           vulns,
@@ -639,7 +641,7 @@ func decisionReason(recommendation string, vulns []models.Vulnerability, signals
 	}
 }
 
-func nextAction(recommendation string, vulnCount int, signals []models.Signal, providerErrorCount int) string {
+func nextAction(recommendation string, vulnCount int, signals []models.Signal, providerErrors []models.ProviderError) string {
 	switch recommendation {
 	case risk.RecommendationAllow:
 		return "install"
@@ -654,11 +656,23 @@ func nextAction(recommendation string, vulnCount int, signals []models.Signal, p
 		}
 		return "review_advisories_before_installing"
 	default:
-		if providerErrorCount > 0 {
+		if hasGitHubAuthDiagnostic(providerErrors) {
+			return "configure_or_verify_github_token_and_retry; or skip/defer; or require_explicit_user_risk_acceptance"
+		}
+		if len(providerErrors) > 0 {
 			return "retry_or_check_manually"
 		}
 		return "review_before_installing"
 	}
+}
+
+func hasGitHubAuthDiagnostic(providerErrors []models.ProviderError) bool {
+	for _, providerError := range providerErrors {
+		if providerError.Provider == "GitHub Advisory DB" && strings.Contains(providerError.Message, "GitHub API access was rate-limited or denied") {
+			return true
+		}
+	}
+	return false
 }
 
 func hasSignalType(signals []models.Signal, signalType string) bool {

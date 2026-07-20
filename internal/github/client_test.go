@@ -1,11 +1,30 @@
 package github
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
+	"io"
+	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/clidey/deptrust/internal/models"
 )
+
+func TestQueryReportsActionableRateLimitDiagnostic(t *testing.T) {
+	client := New(doFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: http.StatusForbidden, Body: io.NopCloser(bytes.NewReader(nil))}, nil
+	}))
+	_, err := client.Query(context.Background(), models.PackageVersion{
+		Ecosystem: models.EcosystemNPM,
+		Package:   "pkg",
+		Version:   "1.0.0",
+	})
+	if err == nil || !strings.Contains(err.Error(), "GitHub API access was rate-limited or denied") || strings.Contains(err.Error(), "Bearer") {
+		t.Fatalf("Query() error = %v, want actionable redacted diagnostic", err)
+	}
+}
 
 func TestConvertAdvisoryIncludesIdentifiersAndPatch(t *testing.T) {
 	raw := advisory{
@@ -77,3 +96,11 @@ func TestAdvisoryDecodeAcceptsStringFirstPatchedVersion(t *testing.T) {
 		t.Fatalf("FirstPatchedVersion.Identifier = %q, want 1.2.3", got)
 	}
 }
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) { return f(req) }
+
+type doFunc func(*http.Request) (*http.Response, error)
+
+func (f doFunc) Do(req *http.Request) (*http.Response, error) { return f(req) }

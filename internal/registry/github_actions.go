@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/clidey/deptrust/internal/githubauth"
 	"github.com/clidey/deptrust/internal/models"
 )
 
@@ -73,7 +74,7 @@ func fetchGitHubActionTags(ctx context.Context, client HTTPClient, owner, repo, 
 
 		resp, err := client.Do(req)
 		if err != nil {
-			return nil, fmt.Errorf("fetch GitHub action tags: %w", err)
+			return nil, fmt.Errorf("fetch GitHub action tags: %s", (&githubauth.Provider{}).Redact(err.Error()))
 		}
 		next := githubNextLink(resp.Header.Get("Link"))
 		if resp.StatusCode == http.StatusNotFound {

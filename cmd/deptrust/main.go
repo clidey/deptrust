@@ -189,6 +189,8 @@ Examples:
   deptrust compare npm lodash 4.17.20 4.17.21
 
 Supported ecosystems: npm, pypi, cargo, go, rubygems, nuget, maven, packagist, pub, cocoapods, hex, hackage, github-actions
+
+GitHub auth: set DEPTRUST_GITHUB_TOKEN in CI, or use DEPTRUST_GITHUB_AUTH=gh locally. Tokens are never stored.
 `))
 }
 

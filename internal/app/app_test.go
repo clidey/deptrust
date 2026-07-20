@@ -381,3 +381,25 @@ func TestCheckPackageReportsUnsupportedProviderCoverage(t *testing.T) {
 		t.Fatalf("SkippedProviders = %#v, want one skipped provider", result.SkippedProviders)
 	}
 }
+
+func TestCheckPackagePromptsForGitHubTokenAfterRateLimit(t *testing.T) {
+	service := App{
+		registry: fakeRegistry{versions: []string{"1.0.0"}},
+		providers: []vulnerabilityClient{fakeOSV{
+			name: "GitHub Advisory DB",
+			err:  errors.New("GitHub API access was rate-limited or denied and no GitHub token is configured"),
+		}},
+		now: time.Now,
+	}
+
+	result, err := service.CheckPackage(context.Background(), models.Query{Ecosystem: models.EcosystemNPM, Package: "pkg", Version: "1.0.0"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Recommendation != risk.RecommendationUnknown {
+		t.Fatalf("Recommendation = %q, want unknown", result.Recommendation)
+	}
+	if result.NextAction != "configure_or_verify_github_token_and_retry; or skip/defer; or require_explicit_user_risk_acceptance" {
+		t.Fatalf("NextAction = %q, want proactive token configuration action", result.NextAction)
+	}
+}

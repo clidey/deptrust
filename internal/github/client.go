@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/clidey/deptrust/internal/githubauth"
 	"github.com/clidey/deptrust/internal/models"
 )
 
@@ -20,12 +21,18 @@ type HTTPClient interface {
 type Client struct {
 	httpClient HTTPClient
 	endpoint   string
+	provider   *githubauth.Provider
 }
 
 func New(client HTTPClient) Client {
+	return NewWithProvider(client, githubauth.NewProvider())
+}
+
+func NewWithProvider(client HTTPClient, provider *githubauth.Provider) Client {
 	return Client{
 		httpClient: client,
 		endpoint:   "https://api.github.com/advisories",
+		provider:   provider,
 	}
 }
 
@@ -126,17 +133,25 @@ func (c Client) queryType(ctx context.Context, pkg models.PackageVersion, adviso
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("query GitHub advisories: %w", err)
+		return nil, fmt.Errorf("query GitHub advisories: %s", (&githubauth.Provider{}).Redact(err.Error()))
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("GitHub advisories returned HTTP %d", resp.StatusCode)
+		message := fmt.Sprintf("GitHub advisories returned HTTP %d", resp.StatusCode)
+		if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusTooManyRequests {
+			if c.provider == nil || c.provider.Token() == "" {
+				message += "; GitHub API access was rate-limited or denied and no GitHub token is configured; set DEPTRUST_GITHUB_TOKEN in CI, or use DEPTRUST_GITHUB_AUTH=gh locally"
+			} else {
+				message += "; GitHub API access was rate-limited or denied; verify the configured token's permissions or expiry"
+			}
+		}
+		return nil, fmt.Errorf("%s", message)
 	}
 
 	var decoded []advisory
 	if err := json.NewDecoder(resp.Body).Decode(&decoded); err != nil {
-		return nil, fmt.Errorf("decode GitHub advisories response: %w", err)
+		return nil, fmt.Errorf("decode GitHub advisories response: %s", (&githubauth.Provider{}).Redact(err.Error()))
 	}
 	return decoded, nil
 }

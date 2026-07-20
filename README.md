@@ -96,6 +96,18 @@ An exact-version check still queries advisory providers when registry verificati
 
 HTTP requests retry `429`, `502`, `503`, and `504` responses up to three total attempts. Retries use short exponential delays and honor `Retry-After` values up to two seconds; longer server-requested waits fail fast so the CLI does not hang. Exhausted advisory retries make the result incomplete and prevent an `allow` recommendation.
 
+### GitHub API authentication
+
+GitHub Advisory Database and GitHub Actions API requests can use a short-lived, least-privilege GitHub App token. In CI, pass it through `DEPTRUST_GITHUB_TOKEN`:
+
+```bash
+DEPTRUST_GITHUB_TOKEN="$GITHUB_APP_TOKEN" deptrust check npm lodash 4.17.20
+```
+
+The credential precedence is `DEPTRUST_GITHUB_TOKEN`, `GITHUB_TOKEN`, then `GH_TOKEN`. For local use, the optional GitHub CLI fallback is enabled explicitly with `DEPTRUST_GITHUB_AUTH=gh deptrust check ...`; it runs `gh auth token` without prompting. If no credential is available, DepTrust continues unauthenticated. A GitHub API rate-limit or permission failure produces `unknown` with diagnostics and is never treated as an OSV-only success.
+
+DepTrust never stores, bundles, caches, logs, telemeters, or emits GitHub tokens. Authentication headers are sent only to `https://api.github.com`.
+
 ## CLI Usage
 
 Check an exact version:
@@ -357,6 +369,8 @@ If using deptrust in a non-MCP context, remind your agent:
 Before listing, comparing, or recommending specific package versions, check them with deptrust. This includes answering "what can I update" — do not provide version recommendations until after checking for known vulnerabilities.
 ```
 
+For CI, configure a short-lived least-privilege GitHub App token as `DEPTRUST_GITHUB_TOKEN` for the process running DepTrust. For local GitHub CLI authentication, use `DEPTRUST_GITHUB_AUTH=gh deptrust check ...`. DepTrust never stores tokens.
+
 ## Manual MCP Setup
 
 If your client supports stdio MCP servers, configure it to run:
@@ -449,6 +463,8 @@ Example compact MCP structured output:
 ```
 
 The compact MCP response omits the vulnerability array, advisory `details`, and repeated `references`. Agents should use the counts, highest severity, provider coverage, recommendation, and next action by default. If the user asks for full advisory details, run the `full_response_command`.
+
+When GitHub advisory access is rate-limited or unavailable, MCP returns `unknown`. The agent should proactively offer to configure a token and retry, skip or defer the version, or proceed only after the user explicitly accepts the unresolved GitHub coverage risk for that exact version. That exception must remain clearly labeled as user-accepted uncertainty; it must not be reported as `allow` or as proof that the version is safe.
 
 ### `suggest_safe_version`
 

@@ -30,7 +30,14 @@ const serverInstructions = "Use this server to vet dependencies for known vulner
 	"'allow' = no blocking known vulnerability found; 'unknown' = provider failure, unavailable registry verification, or incomplete assessment, do NOT treat as safe. " +
 	"When reporting back, include the package, version, recommendation, and the highest-severity advisory IDs found. " +
 	"Boundaries: this checks known public advisories and registry metadata; it does not prove a package is safe, " +
-	"download tarballs, or detect all malware."
+	"download tarballs, or detect all malware. " +
+	"For GitHub API rate limits, CI should pass a short-lived least-privilege GitHub App token via DEPTRUST_GITHUB_TOKEN; " +
+	"local users may opt into DEPTRUST_GITHUB_AUTH=gh. If a GitHub rate-limit diagnostic appears in a tool result, proactively " +
+	"tell the user the assessment is incomplete and offer three explicit choices: configure or verify a token and retry, " +
+	"skip or defer this version, or proceed only if the user explicitly accepts the unresolved GitHub coverage risk for this exact version. " +
+	"Suggest environment configuration or gh CLI authentication, never a token pasted into chat. An explicit executive decision is " +
+	"a user-owned exception, not an allow result: preserve and state the 'unknown' status, the failed provider, and the fact that the " +
+	"user accepted the uncertainty. Never silently override unknown or treat OSV-only findings as safe. DepTrust never stores tokens."
 
 type request struct {
 	JSONRPC string          `json:"jsonrpc"`
