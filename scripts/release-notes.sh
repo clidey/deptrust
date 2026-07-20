@@ -22,7 +22,7 @@ else
 fi
 
 {
-  printf "$heading"
+  printf '%s\n\n' "$heading"
   git log --no-merges --pretty=format:'- %s (%h)' "$range"
   printf '\n'
 } > "$out"
