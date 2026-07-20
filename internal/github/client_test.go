@@ -97,10 +97,6 @@ func TestAdvisoryDecodeAcceptsStringFirstPatchedVersion(t *testing.T) {
 	}
 }
 
-type roundTripFunc func(*http.Request) (*http.Response, error)
-
-func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) { return f(req) }
-
 type doFunc func(*http.Request) (*http.Response, error)
 
 func (f doFunc) Do(req *http.Request) (*http.Response, error) { return f(req) }
