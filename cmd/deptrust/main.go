@@ -96,7 +96,7 @@ func runSetup(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 			}
 		}
 		if codex {
-			if err := configureMCP("codex", []string{"mcp", "remove", "deptrust"}, []string{"mcp", "add", "deptrust", "--", executable, "mcp"}, stdout, stderr); err != nil {
+			if err := configureMCP("codex", []string{"mcp", "get", "deptrust"}, []string{"mcp", "remove", "deptrust"}, []string{"mcp", "add", "deptrust", "--", executable, "mcp"}, executable, stdout, stderr); err != nil {
 				return err
 			}
 		}
@@ -112,12 +112,23 @@ func runSetup(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 			}
 		}
 		if claude {
-			if err := configureMCP("claude", []string{"mcp", "remove", "deptrust", "--scope", "user"}, []string{"mcp", "add", "--transport", "stdio", "--scope", "user", "deptrust", "--", executable, "mcp"}, stdout, stderr); err != nil {
+			if err := configureMCP("claude", []string{"mcp", "get", "deptrust"}, []string{"mcp", "remove", "deptrust", "-s", "user"}, []string{"mcp", "add", "--transport", "stdio", "-s", "user", "deptrust", "--", executable, "mcp"}, executable, stdout, stderr); err != nil {
 				return err
 			}
 		}
 	} else {
 		fmt.Fprintln(stdout, "Claude CLI not found; skipped Claude Code MCP setup.")
+	}
+
+	hooks := false
+	if guided {
+		hooks, err = promptYesNo(reader, stdout, "Install or update deptrust dependency safety hooks?", true)
+		if err != nil {
+			return err
+		}
+	}
+	if err := configureHooks(executable, hooks, stdout); err != nil {
+		return err
 	}
 
 	fmt.Fprintln(stdout, "Setup complete.")
@@ -141,7 +152,14 @@ func promptYesNo(reader *bufio.Reader, stdout io.Writer, question string, defaul
 	return answer == "y" || answer == "yes", nil
 }
 
-func configureMCP(command string, removeArgs, addArgs []string, stdout, stderr io.Writer) error {
+func configureMCP(command string, getArgs, removeArgs, addArgs []string, executable string, stdout, stderr io.Writer) error {
+	get := exec.Command(command, getArgs...)
+	output, err := get.CombinedOutput()
+	if err == nil && mcpMatchesExecutable(string(output), executable) {
+		fmt.Fprintf(stdout, "deptrust is already connected to %s.\n", command)
+		return nil
+	}
+
 	remove := exec.Command(command, removeArgs...)
 	remove.Stdout = io.Discard
 	remove.Stderr = io.Discard
@@ -155,6 +173,11 @@ func configureMCP(command string, removeArgs, addArgs []string, stdout, stderr i
 	}
 	fmt.Fprintf(stdout, "Connected deptrust to %s.\n", command)
 	return nil
+}
+
+func mcpMatchesExecutable(output, executable string) bool {
+	normalized := strings.ToLower(output)
+	return strings.Contains(normalized, "command: "+strings.ToLower(executable)) && strings.Contains(normalized, "arg") && strings.Contains(normalized, "mcp")
 }
 
 func commandAvailable(command string) bool {
