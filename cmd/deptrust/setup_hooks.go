@@ -121,11 +121,15 @@ func reconcileHook(target hookTarget) (bool, error) {
 	temporaryPath := temporary.Name()
 	defer os.Remove(temporaryPath)
 	if _, err := temporary.Write(encoded); err != nil {
-		temporary.Close()
+		if closeErr := temporary.Close(); closeErr != nil {
+			return false, fmt.Errorf("write hook config %s: %v; close temporary config: %w", target.path, err, closeErr)
+		}
 		return false, fmt.Errorf("write hook config %s: %w", target.path, err)
 	}
 	if err := temporary.Chmod(0600); err != nil {
-		temporary.Close()
+		if closeErr := temporary.Close(); closeErr != nil {
+			return false, fmt.Errorf("set hook config permissions %s: %v; close temporary config: %w", target.path, err, closeErr)
+		}
 		return false, fmt.Errorf("set hook config permissions %s: %w", target.path, err)
 	}
 	if err := temporary.Close(); err != nil {
