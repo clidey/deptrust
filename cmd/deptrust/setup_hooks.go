@@ -15,15 +15,15 @@ const (
 	claudeHookMatcher = "Bash|Edit|Write|MultiEdit"
 )
 
-func configureHooks(executable string, install bool, stdout io.Writer) error {
+func configureHooks(executable string, install, useGitHubAuth bool, stdout io.Writer) error {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return fmt.Errorf("find home directory for hooks: %w", err)
 	}
 
 	targets := []hookTarget{
-		{path: filepath.Join(home, ".codex", "hooks.json"), matcher: codexHookMatcher, command: shellQuote(executable) + " hook shell", statusMessage: "Checking dependency safety with deptrust"},
-		{path: filepath.Join(home, ".claude", "settings.json"), matcher: claudeHookMatcher, command: executable, args: []string{"hook", "shell"}},
+		{path: filepath.Join(home, ".codex", "hooks.json"), matcher: codexHookMatcher, command: hookCommand(executable, useGitHubAuth), statusMessage: "Checking dependency safety with deptrust"},
+		{path: filepath.Join(home, ".claude", "settings.json"), matcher: claudeHookMatcher, command: executable, args: []string{"hook", "shell"}, useGitHubAuth: useGitHubAuth},
 	}
 	for _, target := range targets {
 		present, err := deptrustHookPresent(target.path)
@@ -52,6 +52,15 @@ type hookTarget struct {
 	command       string
 	args          []string
 	statusMessage string
+	useGitHubAuth bool
+}
+
+func hookCommand(executable string, useGitHubAuth bool) string {
+	command := shellQuote(executable) + " hook shell"
+	if useGitHubAuth {
+		return "DEPTRUST_GITHUB_AUTH=gh " + command
+	}
+	return command
 }
 
 func reconcileHook(target hookTarget) (bool, error) {
@@ -79,7 +88,19 @@ func reconcileHook(target hookTarget) (bool, error) {
 		"matcher": target.matcher,
 		"hooks":   []any{hookEntry(target)},
 	})
-	if reflect.DeepEqual(preToolUse, filtered) {
+	envChanged := false
+	if target.useGitHubAuth {
+		env, err := object(config, "env")
+		if err != nil {
+			return false, fmt.Errorf("read hook config %s: %w", target.path, err)
+		}
+		if env["DEPTRUST_GITHUB_AUTH"] != "gh" {
+			env["DEPTRUST_GITHUB_AUTH"] = "gh"
+			config["env"] = env
+			envChanged = true
+		}
+	}
+	if reflect.DeepEqual(preToolUse, filtered) && !envChanged {
 		return false, nil
 	}
 	hooks["PreToolUse"] = filtered

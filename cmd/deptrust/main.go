@@ -121,13 +121,20 @@ func runSetup(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	}
 
 	hooks := false
+	githubAuth := false
 	if guided {
 		hooks, err = promptYesNo(reader, stdout, "Install or update deptrust dependency safety hooks?", true)
 		if err != nil {
 			return err
 		}
+		if hooks && commandAvailable("gh") {
+			githubAuth, err = promptYesNo(reader, stdout, "Use your existing gh login for deptrust hook checks?", true)
+			if err != nil {
+				return err
+			}
+		}
 	}
-	if err := configureHooks(executable, hooks, stdout); err != nil {
+	if err := configureHooks(executable, hooks, githubAuth, stdout); err != nil {
 		return err
 	}
 

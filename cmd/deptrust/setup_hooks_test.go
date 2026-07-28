@@ -32,7 +32,7 @@ func TestReconcileHookReplacesLegacyDeptrustHook(t *testing.T) {
 	writeConfig(t, path, original)
 
 	target := hookTarget{
-		path: path, matcher: claudeHookMatcher, command: "/opt/homebrew/bin/deptrust", args: []string{"hook", "shell"},
+		path: path, matcher: claudeHookMatcher, command: "/opt/homebrew/bin/deptrust", args: []string{"hook", "shell"}, useGitHubAuth: true,
 	}
 	if _, err := reconcileHook(target); err != nil {
 		t.Fatal(err)
@@ -41,6 +41,9 @@ func TestReconcileHookReplacesLegacyDeptrustHook(t *testing.T) {
 	config := readConfig(t, path)
 	if got := config["model"]; got != "sonnet" {
 		t.Fatalf("model = %v, want sonnet", got)
+	}
+	if got := config["env"].(map[string]any)["DEPTRUST_GITHUB_AUTH"]; got != "gh" {
+		t.Fatalf("DEPTRUST_GITHUB_AUTH = %v, want gh", got)
 	}
 	preToolUse := config["hooks"].(map[string]any)["PreToolUse"].([]any)
 	if len(preToolUse) != 2 {

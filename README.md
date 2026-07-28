@@ -360,6 +360,8 @@ pnpx @clidey/deptrust@latest install --all
 
 The hooks are `PreToolUse` hooks. They check package install commands before they run, and they also check GitHub Actions added to workflow files through agent file-edit tools. A hook blocks the tool call when deptrust returns `review`, `block`, or `unknown`. The installer writes user-level hook config only: `~/.codex/hooks.json` for Codex and `~/.claude/settings.json` for Claude Code.
 
+When the `gh` CLI is available, guided setup also offers to use its existing local login for hook checks. This writes only `DEPTRUST_GITHUB_AUTH=gh`, never a GitHub token, so hook subprocesses can avoid unauthenticated GitHub API rate limits.
+
 Use narrower installs when preferred:
 
 ```bash

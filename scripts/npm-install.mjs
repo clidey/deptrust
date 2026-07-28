@@ -80,6 +80,7 @@ function parseOptions(args) {
     codexSkill: false,
     claudeCodeMCP: false,
     hook: false,
+    githubAuth: false,
     check: false,
     yes: false,
     guided: false,
@@ -230,6 +231,9 @@ async function maybePromptInstallOptions(options) {
     options.claudeCodeMCP = await confirm(rl, "Register Claude Code MCP server?", true);
     options.codexSkill = await confirm(rl, "Install Codex skill fallback?", true);
     options.hook = await confirm(rl, "Install dependency safety hooks for Codex and Claude Code?", true);
+    if (options.hook && commandExists("gh")) {
+      options.githubAuth = await confirm(rl, "Use your existing gh login for deptrust hook checks?", true);
+    }
   } finally {
     rl.close();
   }
@@ -471,11 +475,11 @@ function maybeInstallHook(options, installPath) {
   if (!options.hook) {
     return;
   }
-  installCodexHook(installPath);
-  installClaudeHook(installPath);
+  installCodexHook(installPath, options.githubAuth);
+  installClaudeHook(installPath, options.githubAuth);
 }
 
-function installCodexHook(installPath) {
+function installCodexHook(installPath, useGitHubAuth) {
   const hooksPath = codexHooksPath();
   const config = readJSONFile(hooksPath);
   config.hooks ||= {};
@@ -486,7 +490,7 @@ function installCodexHook(installPath) {
     hooks: [
       {
         type: "command",
-        command: `${shellQuote(installPath)} hook shell`,
+        command: `${useGitHubAuth ? "DEPTRUST_GITHUB_AUTH=gh " : ""}${shellQuote(installPath)} hook shell`,
         statusMessage: "Checking dependency safety with deptrust",
       },
     ],
@@ -499,10 +503,18 @@ function installCodexHook(installPath) {
   console.log(`Updated the deptrust Codex shell hook in ${hooksPath}.`);
 }
 
-function installClaudeHook(installPath) {
+function installClaudeHook(installPath, useGitHubAuth) {
   const settingsPath = claudeSettingsPath();
   const settings = readJSONFile(settingsPath);
   settings.hooks ||= {};
+  let envChanged = false;
+  if (useGitHubAuth) {
+    settings.env ||= {};
+    if (settings.env.DEPTRUST_GITHUB_AUTH !== "gh") {
+      settings.env.DEPTRUST_GITHUB_AUTH = "gh";
+      envChanged = true;
+    }
+  }
   const current = settings.hooks.PreToolUse || [];
   const next = removeDeptrustHookEntries(current);
   next.push({
@@ -515,7 +527,7 @@ function installClaudeHook(installPath) {
       },
     ],
   });
-  if (JSON.stringify(current) === JSON.stringify(next)) {
+  if (JSON.stringify(current) === JSON.stringify(next) && !envChanged) {
     return;
   }
   settings.hooks.PreToolUse = next;
