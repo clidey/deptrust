@@ -9,7 +9,7 @@ go build -o deptrust ./cmd/deptrust   # build the binary
 go test ./...                         # all tests — NOTE: integration_test.go hits live registries/network
 go test ./internal/risk/...           # one package
 go test ./internal/app/ -run TestName # one test
-./lint.sh                             # golangci-lint with repo config (requires golangci-lint v2.12.2)
+./lint.sh                             # golangci-lint with repo config (requires golangci-lint v2.14.0)
 gofmt -l .                            # CI fails if this prints any file
 ```
 
