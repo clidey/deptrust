@@ -65,10 +65,6 @@ func (a App) CheckPackage(ctx context.Context, query models.Query) (models.Check
 		query.Version = models.LatestVersion
 	}
 
-	if isPrivateGoModule(query) {
-		return a.privateGoResult(query), nil
-	}
-
 	restriction, err := sourceRestriction(ctx, query)
 	if err != nil {
 		return models.CheckResult{}, err

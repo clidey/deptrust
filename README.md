@@ -532,7 +532,7 @@ If a package check returns `unknown`, do not treat the package as safe. It means
 
 ### Private Go modules
 
-Export `GOPRIVATE` in the environment of the CLI or MCP server to identify private
+Configure `GOPRIVATE` through the environment or `go env -w` to identify private
 Go module paths:
 
 ```sh
@@ -548,9 +548,12 @@ This does not verify the module's existence, authenticate to its repository, or
 scan its dependencies. Other ecosystems and nonmatching Go modules retain their
 normal behavior.
 
-DepTrust reads the exported environment variable directly; settings saved only
-with `go env -w GOPRIVATE=...` are not read. For MCP, configure `GOPRIVATE` in the
-server's environment. `GONOPROXY` and `GONOSUMDB` do not override this privacy
+A nonempty exported `GOPRIVATE` takes precedence. Otherwise DepTrust runs
+`go env GOPRIVATE` to read the effective saved configuration, including `GOENV`
+overrides and `GOENV=off`. This requires Go on PATH unless a nonempty `GOPRIVATE`
+is exported. Failure to read the configuration stops before public requests.
+Toolchain downloads and Go telemetry are disabled for this configuration read.
+For MCP, configure the environment of the server process. `GONOPROXY` and `GONOSUMDB` do not override this privacy
 policy. Configure patterns before checking private names: unmarked paths use
 public services.
 
@@ -568,7 +571,7 @@ deptrust check --json --nuget-config /absolute/path/to/nuget.config nuget Compan
 ```
 
 For MCP, pass `project_dir` (npm) or `nuget_config` (NuGet) on each tool call.
-Follow-up commands retain the selected configuration. No configuration is
+Follow-up commands retain the selected configuration. No project directory is
 implicitly taken from the MCP server's working directory. Without these options,
 checks continue to use the public registries.
 
@@ -599,3 +602,45 @@ Official references: [npm scope registry mappings](https://docs.npmjs.com/cli/v1
 [npm configuration](https://docs.npmjs.com/cli/v11/using-npm/config/),
 [NuGet source mapping and precedence](https://learn.microsoft.com/en-us/nuget/consume-packages/package-source-mapping),
 [NuGet configuration selection](https://learn.microsoft.com/en-us/nuget/consume-packages/configuring-nuget-behavior).
+
+### Cargo and Poetry package sources
+
+The same explicit `--project-dir` option (MCP: `project_dir`) supports Cargo and
+Poetry projects:
+
+```sh
+deptrust check --json --project-dir /absolute/path/to/rust-project cargo internal-crate 1.2.3
+deptrust check --json --project-dir /absolute/path/to/python-project pypi internal-package 1.2.3
+```
+
+- **Cargo:** requires Cargo on PATH. Reads workspace dependency declarations with
+  `cargo metadata --format-version 1 --no-deps --offline`. Alternate registries,
+  Git/path dependencies, workspace packages, aliases queried instead of actual
+  crate names, and names not declared as workspace dependencies return `unknown`.
+  Use the actual crate name for renamed dependencies. Before permitting a public
+  check, resolved sources are confirmed with offline, locked metadata so that
+  local/Git patches cannot be mistaken for crates.io artifacts. This requires a
+  current lockfile and cached metadata for the resolved graph; failures stop
+  before public requests. This does not build code or fetch missing dependencies.
+  It does not scan arbitrary transitive dependencies or authenticate to registries.
+- **Poetry:** requires Python 3.11+ on PATH as `python3`, using the standard
+  `tomllib` parser in isolated mode. Reads `pyproject.toml` without executing
+  project code or invoking installation. Supports explicit `source` constraints,
+  dependency groups, legacy dev-dependencies, and Poetry enrichment of PEP 621
+  dependencies. PyPI-bound dependencies can proceed; custom source constraints
+  and direct Git/path/URL dependencies return `unknown`. Unconstrained packages
+  also return `unknown` if custom primary/supplemental sources could supply them.
+  Unused explicit sources do not affect other dependencies. Source constraints
+  are not inherited by dependencies. Undeclared packages return `unknown`; this
+  does not scan a lockfile or resolve transitive dependencies. Deprecated Poetry
+  `default`/`secondary` priority settings are rejected rather than guessed.
+
+Both options work for checks, suggestions, and comparisons, retain project
+selection in MCP follow-up commands, and skip public registry/advisory requests
+when source identity is unsupported or uncertain. Parser/tool errors stop before
+public requests. Calls without project targeting retain public-registry behavior.
+
+Official references: [Go environment configuration](https://pkg.go.dev/cmd/go#hdr-Environment_variables),
+[Cargo metadata](https://doc.rust-lang.org/cargo/commands/cargo-metadata.html),
+[Poetry package source constraints](https://python-poetry.org/docs/repositories/#package-source-constraint),
+[Python TOML parser](https://docs.python.org/3/library/tomllib.html).

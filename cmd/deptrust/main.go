@@ -203,7 +203,7 @@ func runCheck(ctx context.Context, service app.App, args []string, stdout io.Wri
 	flags := flag.NewFlagSet("check", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	jsonOutput := flags.Bool("json", false, "emit JSON")
-	projectDir := flags.String("project-dir", "", "absolute npm project directory")
+	projectDir := flags.String("project-dir", "", "absolute npm, Cargo, or Poetry project directory")
 	nugetConfig := flags.String("nuget-config", "", "absolute NuGet configuration file (used alone)")
 	if err := flags.Parse(args); err != nil {
 		return err
@@ -239,7 +239,7 @@ func runSuggest(ctx context.Context, service app.App, args []string, stdout io.W
 	flags := flag.NewFlagSet("suggest", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	jsonOutput := flags.Bool("json", false, "emit JSON")
-	projectDir := flags.String("project-dir", "", "absolute npm project directory")
+	projectDir := flags.String("project-dir", "", "absolute npm, Cargo, or Poetry project directory")
 	nugetConfig := flags.String("nuget-config", "", "absolute NuGet configuration file (used alone)")
 	if err := flags.Parse(args); err != nil {
 		return err
@@ -270,7 +270,7 @@ func runCompare(ctx context.Context, service app.App, args []string, stdout io.W
 	flags := flag.NewFlagSet("compare", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	jsonOutput := flags.Bool("json", false, "emit JSON")
-	projectDir := flags.String("project-dir", "", "absolute npm project directory")
+	projectDir := flags.String("project-dir", "", "absolute npm, Cargo, or Poetry project directory")
 	nugetConfig := flags.String("nuget-config", "", "absolute NuGet configuration file (used alone)")
 	if err := flags.Parse(args); err != nil {
 		return err

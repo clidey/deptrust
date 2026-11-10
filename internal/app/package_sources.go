@@ -19,19 +19,38 @@ import (
 // sourceRestriction checks only explicitly selected package-manager configuration.
 // Configuration failures stop assessment before any public request.
 func sourceRestriction(ctx context.Context, query models.Query) (string, error) {
+	if query.ProjectDir != "" && query.NuGetConfig != "" {
+		return "", fmt.Errorf("select project_dir or nuget_config, not both")
+	}
+
+	if query.Ecosystem == models.EcosystemGo {
+		patterns, err := goPrivatePatterns(ctx)
+		if err != nil {
+			return "", err
+		}
+		if isPrivateGoModule(query, patterns) {
+			return "Private Go module matches GOPRIVATE; public registry and advisory requests were skipped. Advisory coverage is unavailable.", nil
+		}
+	}
 	if query.ProjectDir != "" {
 		if !filepath.IsAbs(query.ProjectDir) {
 			return "", fmt.Errorf("project_dir must be absolute")
 		}
-		if query.Ecosystem != models.EcosystemNPM {
-			return "", fmt.Errorf("project_dir is supported only for npm; use nuget_config for NuGet")
-		}
-		registry, err := npmRegistry(ctx, query)
-		if err != nil {
-			return "", err
-		}
-		if !publicSource(registry, "registry.npmjs.org", "/") {
-			return "Configured npm registry is not the supported public registry; public registry and advisory requests were skipped. Assessment is unavailable.", nil
+		switch query.Ecosystem {
+		case models.EcosystemNPM:
+			registry, err := npmRegistry(ctx, query)
+			if err != nil {
+				return "", err
+			}
+			if !publicSource(registry, "registry.npmjs.org", "/") {
+				return "Configured npm registry is not the supported public registry; public registry and advisory requests were skipped. Assessment is unavailable.", nil
+			}
+		case models.EcosystemCargo:
+			return cargoRestriction(ctx, query)
+		case models.EcosystemPyPI:
+			return poetryRestriction(ctx, query)
+		default:
+			return "", fmt.Errorf("project_dir is supported for npm, Cargo, and Poetry; use nuget_config for NuGet")
 		}
 	}
 	if query.NuGetConfig != "" {

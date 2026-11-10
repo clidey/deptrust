@@ -1,21 +1,25 @@
 package app
 
 import (
+	"context"
+	"fmt"
 	"os"
+	"os/exec"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/clidey/deptrust/internal/models"
 	"github.com/clidey/deptrust/internal/risk"
 )
 
 // isPrivateGoModule applies Go's GOPRIVATE module-prefix glob semantics.
-func isPrivateGoModule(query models.Query) bool {
+func isPrivateGoModule(query models.Query, patterns string) bool {
 	if query.Ecosystem != models.EcosystemGo {
 		return false
 	}
 	target := strings.TrimSpace(query.Package)
-	for _, glob := range strings.Split(os.Getenv("GOPRIVATE"), ",") {
+	for _, glob := range strings.Split(patterns, ",") {
 		glob = strings.TrimSuffix(glob, "/")
 		if glob == "" {
 			continue
@@ -41,9 +45,20 @@ func isPrivateGoModule(query models.Query) bool {
 	return false
 }
 
-func (a App) privateGoResult(query models.Query) models.CheckResult {
-	const reason = "Private Go module matches GOPRIVATE; public registry and advisory requests were skipped. Advisory coverage is unavailable."
-	return a.unavailableSourceResult(query, reason)
+// goPrivatePatterns delegates saved GOENV settings and precedence to Go itself.
+func goPrivatePatterns(ctx context.Context) (string, error) {
+	if value := os.Getenv("GOPRIVATE"); value != "" {
+		return value, nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "go", "env", "GOPRIVATE")
+	cmd.Env = append(os.Environ(), "GOTOOLCHAIN=local", "GOTELEMETRY=off")
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("cannot read effective GOPRIVATE; install Go or export GOPRIVATE before checking Go modules")
+	}
+	return strings.TrimSpace(string(out)), nil
 }
 
 func (a App) unavailableSourceResult(query models.Query, reason string) models.CheckResult {

@@ -55,11 +55,11 @@ func TestPrivateGoPrefixMatching(t *testing.T) {
 		t.Run(tt.patterns+tt.module, func(t *testing.T) {
 			t.Setenv("GOPRIVATE", tt.patterns)
 			q := models.Query{Ecosystem: models.EcosystemGo, Package: tt.module}
-			if got := isPrivateGoModule(q); got != tt.want {
+			if got := isPrivateGoModule(q, tt.patterns); got != tt.want {
 				t.Fatalf("got %v, want %v", got, tt.want)
 			}
 			q.Ecosystem = models.EcosystemNPM
-			if isPrivateGoModule(q) {
+			if isPrivateGoModule(q, tt.patterns) {
 				t.Fatal("privacy handling applied to npm")
 			}
 		})
