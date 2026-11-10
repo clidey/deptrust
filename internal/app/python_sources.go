@@ -162,6 +162,9 @@ func pipenvRestriction(root map[string]any, name string, locked bool) (string, e
 		}
 		sources[key] = text(source["url"])
 	}
+	if locked && len(sources) == 0 {
+		return unsupportedArtifactSource, nil
+	}
 	found := false
 	for category, raw := range root {
 		if category == "_meta" || category == "requires" || category == "pipenv" {

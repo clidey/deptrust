@@ -833,8 +833,8 @@ Hooks also accept optional `source_context` containing the same `project_dir`,
 `nuget_config`, `bundler_lock`, or `source_file` selector used by CLI/MCP. The
 wrapper supplying hook JSON must provide it explicitly; identity/version fields
 cannot override parsed install requests. With an absolute `cwd`, hooks use npm or
-Cargo project context and recognized Python/Composer/Dart/Bundler artifacts.
-New dependencies not yet represented by those artifacts may return `unknown`.
-NuGet/Maven project installs require explicit context rather than guessing
-inherited repositories. This does not turn command parsing into a complete shell
+Cargo project context; Go uses effective GOPRIVATE independently. Other project
+installs require explicit context rather than guessing inherited repositories
+from a nearby artifact. New dependencies not yet represented by selected
+artifacts may return `unknown`. This does not turn command parsing into a complete shell
 interpreter; unrecognized commands and source overrides remain documented limits.

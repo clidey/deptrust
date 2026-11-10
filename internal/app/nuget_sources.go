@@ -9,7 +9,8 @@ import (
 )
 
 type nugetSourceMapping struct {
-	Key      string `xml:"key,attr"`
+	Unknown  []struct{} `xml:",any"`
+	Key      string     `xml:"key,attr"`
 	Packages []struct {
 		Pattern string `xml:"pattern,attr"`
 	} `xml:"package"`
@@ -63,7 +64,7 @@ func parseNuGetSources(data []byte) (map[string]string, []nugetSourceMapping, er
 			}
 			if section == "packageSourceMapping" && element.Name.Local == "packageSource" {
 				var mapping nugetSourceMapping
-				if err := decoder.DecodeElement(&mapping, &element); err != nil || mapping.Key == "" {
+				if err := decoder.DecodeElement(&mapping, &element); err != nil || mapping.Key == "" || len(mapping.Unknown) > 0 {
 					return nil, nil, fmt.Errorf("invalid NuGet source mapping")
 				}
 				// Source keys are unique in the selected configuration.
