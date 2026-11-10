@@ -15,6 +15,8 @@ const unsupportedArtifactSource = "Selected source artifact does not exclusively
 
 func artifactRestriction(_ context.Context, query models.Query) (string, error) {
 	switch query.Ecosystem {
+	case models.EcosystemPub:
+		return dartRestriction(query)
 	case models.EcosystemPackagist:
 		return composerRestriction(query)
 	default:

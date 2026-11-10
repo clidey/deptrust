@@ -699,3 +699,18 @@ packages. Source context options are mutually exclusive.
 
 Official references: [Composer repositories](https://getcomposer.org/doc/05-repositories.md),
 [repository priority and filters](https://getcomposer.org/doc/articles/repository-priorities.md).
+
+### Dart/pub sources
+
+`--source-file /absolute/path/to/pubspec.yaml` or `pubspec.lock` (MCP:
+`source_file`) reads declared or locked Dart sources natively. Hosted pub.dev
+identities can proceed; custom hosted URLs, Git/path/SDK dependencies, workspace
+inheritance, missing packages, and unsupported identities return `unknown`.
+`dependency_overrides` in the selected pubspec take precedence. A custom
+`PUB_HOSTED_URL` always prevents public checks, even without a selected file.
+The selected artifact is not merged with pubspec_overrides.yaml or workspace
+configuration; supply the intended artifact and do not treat this as freshness
+verification. No Dart commands, downloads, or project code are executed.
+
+Official references: [Dart dependency sources](https://dart.dev/tools/pub/dependencies),
+[pub environment](https://dart.dev/tools/pub/environment-variables).

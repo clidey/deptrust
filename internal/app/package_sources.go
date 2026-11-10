@@ -28,6 +28,11 @@ func sourceRestriction(ctx context.Context, query models.Query) (string, error) 
 	if selected > 1 {
 		return "", fmt.Errorf("select only one source context")
 	}
+	if query.Ecosystem == models.EcosystemPub {
+		if hosted := os.Getenv("PUB_HOSTED_URL"); hosted != "" && !publicSource(hosted, "pub.dev", "/") {
+			return "PUB_HOSTED_URL selects an unsupported source; public requests were skipped. Assessment is unavailable.", nil
+		}
+	}
 	if query.SourceFile != "" {
 		if !filepath.IsAbs(query.SourceFile) {
 			return "", fmt.Errorf("source_file must be absolute")

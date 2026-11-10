@@ -36,3 +36,32 @@ func TestComposerRepositories(t *testing.T) {
 		}
 	}
 }
+
+func TestDartSources(t *testing.T) {
+	t.Setenv("PUB_HOSTED_URL", "")
+	for _, tt := range []struct {
+		config  string
+		blocked bool
+	}{
+		{"dependencies:\n  secret: ^1.0.0\n", false},
+		{"dependencies:\n  secret: {hosted: https://private.invalid, version: ^1}\n", true},
+		{"dependencies:\n  secret: ^1\ndependency_overrides:\n  secret: {path: ../secret}\n", true},
+		{"packages:\n  secret:\n    source: hosted\n    description: {name: secret, url: https://pub.dev}\n", false},
+		{"packages:\n  secret:\n    source: git\n    description: {url: https://private.invalid/secret}\n", true},
+	} {
+		file := filepath.Join(t.TempDir(), "pubspec.yaml")
+		if err := os.WriteFile(file, []byte(tt.config), 0600); err != nil {
+			t.Fatal(err)
+		}
+		q := models.Query{Ecosystem: models.EcosystemPub, Package: "secret", SourceFile: file}
+		reason, err := sourceRestriction(context.Background(), q)
+		if err != nil || (reason != "") != tt.blocked {
+			t.Fatalf("%q %v", reason, err)
+		}
+		if tt.blocked {
+			assertUnavailableSource(t, q)
+		}
+	}
+	t.Setenv("PUB_HOSTED_URL", "https://private.invalid")
+	assertUnavailableSource(t, models.Query{Ecosystem: models.EcosystemPub, Package: "secret"})
+}
