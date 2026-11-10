@@ -798,3 +798,18 @@ lockfile does not verify Podfile freshness, local repository configuration, or
 installed artifact provenance. No Podfile or Ruby project code is evaluated.
 
 Reference: [official CocoaPods lockfile implementation](https://github.com/CocoaPods/Core/blob/master/lib/cocoapods-core/lockfile.rb).
+
+### Hex repository metadata
+
+For Hex, `source_file` accepts a selected official package API response JSON.
+The package name, `repository: hexpm`, and hex.pm package URL must agree before
+public assessment proceeds. Organization/custom repository metadata, mismatched
+identities, and missing fields return `unknown`. Repository-qualified names also
+skip public requests without a selected file. Metadata is a caller-selected
+snapshot, not live authentication or provenance verification. DepTrust does not
+fetch private metadata on your behalf or evaluate Mix files. `mix.lock` parsing
+and effective Mix organization/repository routing remain unsupported.
+
+References: [Hex private organizations](https://hex.pm/docs/private),
+[Hex repository usage](https://hex.pm/docs/usage),
+[official repository-qualified naming](https://github.com/hexpm/hex/blob/main/lib/hex/utils.ex).

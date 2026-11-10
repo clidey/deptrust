@@ -39,6 +39,9 @@ func sourceRestriction(ctx context.Context, query models.Query) (string, error) 
 			return "PUB_HOSTED_URL selects an unsupported source; public requests were skipped. Assessment is unavailable.", nil
 		}
 	}
+	if query.Ecosystem == models.EcosystemHex && strings.Contains(query.Package, "/") {
+		return "Repository-qualified Hex package is not a public hexpm identity; public requests were skipped. Assessment is unavailable.", nil
+	}
 	if query.SourceFile != "" {
 		if !filepath.IsAbs(query.SourceFile) {
 			return "", fmt.Errorf("source_file must be absolute")
