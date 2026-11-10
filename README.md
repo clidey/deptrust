@@ -786,7 +786,10 @@ Only exclusively Maven Central endpoints permit a public assessment. Custom,
 mixed, Ivy/local, or uncertain source sets return `unknown`, including mixed
 Gradle repositories where a content filter might exclude the private source for
 this particular module. The implementation does not use internal filter APIs or
-pretend it can prove that narrower routing.
+pretend it can prove that narrower routing. The context is the installed tool and
+current environment (including MAVEN_ARGS/Gradle properties); flags supplied only
+to a separate future invocation are not inferred. Hooks stop on explicit profile,
+property, or settings overrides rather than losing that context.
 
 A standalone Maven effective XML supplied via `source_file` still returns
 `unknown`: one artifact alone cannot establish the full effective source set.

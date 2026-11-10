@@ -48,8 +48,12 @@ func RunShell(ctx context.Context, service app.App, in io.Reader, out io.Writer)
 		fields := strings.Fields(toolInputString(input.ToolInput, "command"))
 		for _, field := range fields {
 			flag, _, _ := strings.Cut(field, "=")
+			if strings.HasPrefix(field, "-P") || (strings.HasPrefix(field, "-D") && !strings.HasPrefix(field, "-Dartifact=")) || (strings.HasPrefix(field, "-s") && !strings.HasPrefix(field, "--")) || strings.HasPrefix(field, "-gs") {
+				return deny(out, "deptrust cannot infer project profiles/properties/settings from install flags; run a check with the same explicit source context")
+			}
+
 			switch flag {
-			case "--registry", "--index-url", "--extra-index-url", "--source", "--repository", "--configfile", "--directory", "--prefix", "--cwd", "-C", "-i", "--find-links", "--no-index", "--config", "--userconfig", "--globalconfig", "--settings", "-s", "--project", "--manifest-path":
+			case "--registry", "--index-url", "--extra-index-url", "--source", "--repository", "--configfile", "--directory", "--prefix", "--cwd", "-C", "-i", "--find-links", "--no-index", "--config", "--userconfig", "--globalconfig", "--settings", "-s", "--project", "--manifest-path", "--activate-profiles", "--global-settings", "--init-script", "-I", "--project-prop":
 				return deny(out, "deptrust cannot establish source context for this install override; run an explicit source-aware check before installing")
 			}
 		}
