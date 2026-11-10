@@ -92,11 +92,18 @@ func sourceRestriction(ctx context.Context, query models.Query) (string, error) 
 }
 
 func npmRegistry(ctx context.Context, query models.Query) (string, error) {
+	return npmRegistryWithConfig(ctx, query, "")
+}
+
+func npmRegistryWithConfig(ctx context.Context, query models.Query, config string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	get := func(key string) (string, error) {
 		cmd := exec.CommandContext(ctx, "npm", "config", "get", key)
 		cmd.Dir = query.ProjectDir
+		if config != "" {
+			cmd.Env = append(os.Environ(), "NPM_CONFIG_USERCONFIG="+config, "npm_config_userconfig="+config)
+		}
 		out, err := cmd.Output()
 		if err != nil {
 			return "", fmt.Errorf("cannot read npm registry configuration for project")

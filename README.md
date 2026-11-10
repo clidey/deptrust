@@ -734,3 +734,22 @@ No Python tools or build backends run. Unsupported configuration stops the check
 References: [uv indexes](https://docs.astral.sh/uv/configuration/indexes/),
 [Pipenv indexes](https://pipenv.pypa.io/en/stable/indexes.html),
 [pip configuration](https://pip.pypa.io/en/stable/topics/configuration/).
+
+### Yarn and pnpm
+
+For npm ecosystem checks, `--source-file` accepts Yarn Classic `.yarnrc`, Yarn
+Berry `.yarnrc.yml`, and pnpm `pnpm-workspace.yaml`/`config.yaml`. Registry and
+scope mappings in the selected file determine whether public assessment applies.
+Unknown/custom registry identities return `unknown`. Named pnpm registry routing
+is unsupported and returns `unknown`. Registry URL interpolation is not guessed.
+This is a selected-file assessment, not a merge of all inherited package-manager
+configuration, plugins, package overrides, aliases, or command-line options.
+
+A selected `.npmrc` is parsed by npm itself as user configuration in its directory;
+normal npm project/environment precedence still applies. Yarn Classic registry
+lines support the documented simple quoted/unquoted form; other source overrides
+need explicit context. A public npm scope is not evidence of privacy, and private
+npmjs.org packages cannot be identified reliably from a scope name alone.
+
+References: [Yarn settings](https://yarnpkg.com/configuration/yarnrc/),
+[pnpm settings](https://pnpm.io/settings), [npm config](https://docs.npmjs.com/cli/v11/using-npm/config/).

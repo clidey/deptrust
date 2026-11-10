@@ -65,3 +65,30 @@ func TestDartSources(t *testing.T) {
 	t.Setenv("PUB_HOSTED_URL", "https://private.invalid")
 	assertUnavailableSource(t, models.Query{Ecosystem: models.EcosystemPub, Package: "secret"})
 }
+
+func TestJavaScriptManagerSources(t *testing.T) {
+	for _, tt := range []struct {
+		file, config string
+		blocked      bool
+	}{
+		{".yarnrc.yml", "npmRegistryServer: https://registry.yarnpkg.com\n", false},
+		{".yarnrc.yml", "npmScopes:\n  company:\n    npmRegistryServer: https://private.invalid\n", true},
+		{"pnpm-workspace.yaml", "registry: https://private.invalid\n", true},
+		{"pnpm-workspace.yaml", "registries:\n  '@company': https://private.invalid\n", true},
+		{".yarnrc", "registry \"https://registry.yarnpkg.com\"\n", false},
+		{".yarnrc", "registry \"https://private.invalid\"\n", true},
+	} {
+		file := filepath.Join(t.TempDir(), tt.file)
+		if err := os.WriteFile(file, []byte(tt.config), 0600); err != nil {
+			t.Fatal(err)
+		}
+		q := models.Query{Ecosystem: models.EcosystemNPM, Package: "@company/secret", SourceFile: file}
+		reason, err := sourceRestriction(context.Background(), q)
+		if err != nil || (reason != "") != tt.blocked {
+			t.Fatalf("%q %v", reason, err)
+		}
+		if tt.blocked {
+			assertUnavailableSource(t, q)
+		}
+	}
+}
