@@ -18,7 +18,7 @@ func artifactRestriction(ctx context.Context, query models.Query) (string, error
 	case models.EcosystemGitHubActions:
 		return actionArtifactRestriction(query)
 	case models.EcosystemHex:
-		return hexArtifactRestriction(query)
+		return hexArtifactRestriction(ctx, query)
 	case models.EcosystemCocoaPods:
 		return cocoapodsArtifactRestriction(query)
 	case models.EcosystemHackage:

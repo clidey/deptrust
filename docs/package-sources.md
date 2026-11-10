@@ -24,7 +24,7 @@ Do not use an incomplete snapshot to establish an effective private/public bound
 | Dart/pub | Selected pubspec/lock sources, dependency overrides; PUB_HOSTED_URL | No workspace/pubspec_overrides.yaml merge or freshness |
 | Maven | Selected effective XML is recognized and returns unknown | One artifact omits other effective sources; full routing not implemented |
 | Gradle | Official mechanisms researched; no routing implementation | Lockfiles omit routing; evaluating build configuration or inventing an export is outside this static-artifact implementation |
-| Hex | Selected API package metadata; qualified repository names | No Mix lockfile parsing, effective repository overrides, or authenticated private fetching |
+| Hex | Selected API metadata or parser-only mix.lock AST; qualified repository names | Mix parsing requires Elixir; no effective runtime repository overrides or authenticated private fetching |
 | Cabal | Selected plan.json package/repository locations | No plan generation, config inheritance, or freshness verification |
 | CocoaPods | Selected Podfile.lock spec repos and external sources | No Podfile evaluation, installed repo overrides, or freshness verification |
 | GitHub Actions | Local/container identities; selected repository visibility API response | No live authenticated visibility discovery or enterprise-host support |

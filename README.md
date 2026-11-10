@@ -808,8 +808,8 @@ public assessment proceeds. Organization/custom repository metadata, mismatched
 identities, and missing fields return `unknown`. Repository-qualified names also
 skip public requests without a selected file. Metadata is a caller-selected
 snapshot, not live authentication or provenance verification. DepTrust does not
-fetch private metadata on your behalf or evaluate Mix files. `mix.lock` parsing
-and effective Mix organization/repository routing remain unsupported.
+fetch private metadata on your behalf or evaluate Mix files. `mix.lock` parsing is supported as described below; effective Mix runtime repository
+overrides and authenticated private fetching remain separate.
 
 References: [Hex private organizations](https://hex.pm/docs/private),
 [Hex repository usage](https://hex.pm/docs/usage),
@@ -859,3 +859,21 @@ errors stop public requests. `--nuget-config` retains NuGet's standalone-file mo
 Hooks can use their absolute cwd for effective NuGet context.
 
 Reference: [official NuGet configuration hierarchy](https://learn.microsoft.com/en-us/nuget/consume-packages/configuring-nuget-behavior/).
+
+### Mix lockfile sources
+
+Hex `source_file` also accepts `mix.lock`. DepTrust invokes Elixir's official
+`Code.string_to_quoted!` parser and inspects the returned AST without evaluating
+the lockfile or loading mix.exs. Public `:hex` tuples must identify the queried
+package and the `hexpm` repository (including Hex's legacy default repository).
+Organization/custom repositories, Git entries, aliases queried as package names,
+unlisted packages, and executable expressions return `unknown`. Syntax/tool
+errors stop before public requests. Elixir must be on PATH.
+
+Tests run the same parser in a cached official Elixir container with networking
+disabled, read-only fixtures, and an executable-lockfile marker that must never
+be created. Set `DEPTRUST_TEST_ELIXIR_IMAGE` to a cached digest to run that optional
+oracle when Elixir is not installed; normal product code does not invoke Docker.
+
+References: [Elixir AST parsing](https://elixir.hexdocs.pm/Code.html#string_to_quoted/2),
+[Hex lock tuple semantics](https://github.com/hexpm/hex/blob/main/lib/hex/utils.ex).

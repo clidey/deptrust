@@ -1,8 +1,15 @@
 package app
 
-import "github.com/clidey/deptrust/internal/models"
+import (
+	"context"
+	"github.com/clidey/deptrust/internal/models"
+	"path/filepath"
+)
 
-func hexArtifactRestriction(q models.Query) (string, error) {
+func hexArtifactRestriction(ctx context.Context, q models.Query) (string, error) {
+	if filepath.Base(q.SourceFile) == "mix.lock" {
+		return mixArtifactRestriction(ctx, q)
+	}
 	metadata, err := readArtifactJSON(q.SourceFile)
 	if err != nil {
 		return "", err
