@@ -19,6 +19,8 @@ func TestBundlerLockedSources(t *testing.T) {
 		blocked    bool
 	}{
 		{"public", "GEM\n  remote: https://rubygems.org/\n  specs:\n    example (1.0.0)\n", false},
+		{"public alongside path", "GEM\n  remote: https://rubygems.org/\n  specs:\n    example (1.0.0)\n\nPATH\n  remote: ../other\n  specs:\n    other (1.0.0)\n", false},
+		{"same name foreign", "GEM\n  remote: https://rubygems.org/\n  specs:\n    example (1.0.0)\n\nGIT\n  remote: https://private.invalid/example\n  specs:\n    example (2.0.0)\n", true},
 		{"custom", "GEM\n  remote: https://user:secret@corp.invalid/\n  specs:\n    example (1.0.0)\n", true},
 		{"mixed remotes", "GEM\n  remote: https://rubygems.org/\n  remote: https://corp.invalid/\n  specs:\n    example (1.0.0)\n", true},
 		{"unlisted", "GEM\n  remote: https://rubygems.org/\n  specs:\n    other (1.0.0)\n", true},

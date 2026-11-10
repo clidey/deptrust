@@ -662,9 +662,9 @@ sources. This follows the source recorded after Bundler resolves per-gem `source
 options and source blocks. Only gems exclusively associated with the HTTPS
 RubyGems.org source proceed to public checks. Custom sources, mixed remotes,
 missing gems, and source uncertainty return `unknown` without public requests.
-For this initial support, a lockfile containing any Git, path, or plugin source
-also returns `unknown`, including for unrelated public gems; these source objects
-are not constructed. Credential URLs never appear in results.
+Git, path, and plugin source objects are not constructed. Their locked gem names
+remain unsupported, while unrelated RubyGems.org gems can still be assessed.
+The same gem name appearing in both public and unsupported sources returns `unknown`. Credential URLs never appear in results.
 
 This inspects the selected artifact only. It does not evaluate Gemfile, verify
 that the lockfile matches current Gemfile declarations, apply local source

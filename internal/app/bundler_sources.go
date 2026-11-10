@@ -18,13 +18,25 @@ require "bundler"
 require "json"
 require "uri"
 text = File.read(ARGV[0])
-if text.lines.any? { |line| %w[GIT PATH PLUGIN].include?(line.strip) && line == line.lstrip }
-  # Avoid constructing path, Git, and plugin sources. These may depend on
-  # project context or load plugin code; this artifact cannot be assessed.
+# Keep only GEM source sections for the official parser. Record gem names in
+# other source sections without constructing Git/path/plugin source objects.
+safe = []
+foreign = []
+section = nil
+text.each_line do |line|
+  section = line.strip if line.match?(/\A\S/)
+  if section == "GEM"
+    safe << line
+  elsif %w[GIT PATH PLUGIN].include?(section)
+    match = line.match(/\A    ([^\s(]+) \(/)
+    foreign << match[1] if match
+  end
+end
+if foreign.include?(ARGV[1])
   puts JSON.generate({restricted: true})
   exit
 end
-parsed = Bundler::LockfileParser.new(text)
+parsed = Bundler::LockfileParser.new(safe.join)
 specs = parsed.specs.select { |spec| spec.name == ARGV[1] }
 restricted = specs.empty? || specs.any? do |spec|
   source = spec.source
