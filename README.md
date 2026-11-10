@@ -714,3 +714,23 @@ verification. No Dart commands, downloads, or project code are executed.
 
 Official references: [Dart dependency sources](https://dart.dev/tools/pub/dependencies),
 [pub environment](https://dart.dev/tools/pub/environment-variables).
+
+### uv, Pipenv, and pip
+
+For Python, `--source-file` additionally accepts `uv.lock`, uv `pyproject.toml`,
+`Pipfile`, `Pipfile.lock`, `pip.conf`, or `pip.ini`. uv index constraints and locked
+registry identities, Pipenv index assignments, and selected pip global/install
+index settings are read natively. Custom, direct, ambiguous, or undeclared
+identities return `unknown`. Explicit uv indexes unused by a dependency do not
+restrict that dependency. Marker alternatives are considered together.
+
+Custom index/find-links/no-index environment settings for pip and uv prevent
+public requests, even without a selected artifact. `PIP_CONFIG_FILE` is checked
+when set. A selected pip file is not a reconstruction of pip's complete global,
+user, virtualenv, and command-line configuration hierarchy. Selected lockfiles
+are snapshots; project configuration overrides and freshness are not inferred.
+No Python tools or build backends run. Unsupported configuration stops the check.
+
+References: [uv indexes](https://docs.astral.sh/uv/configuration/indexes/),
+[Pipenv indexes](https://pipenv.pypa.io/en/stable/indexes.html),
+[pip configuration](https://pip.pypa.io/en/stable/topics/configuration/).

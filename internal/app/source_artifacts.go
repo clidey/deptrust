@@ -13,8 +13,10 @@ import (
 
 const unsupportedArtifactSource = "Selected source artifact does not exclusively establish this package from the supported public registry; public registry and advisory requests were skipped. Assessment is unavailable."
 
-func artifactRestriction(_ context.Context, query models.Query) (string, error) {
+func artifactRestriction(ctx context.Context, query models.Query) (string, error) {
 	switch query.Ecosystem {
+	case models.EcosystemPyPI:
+		return pythonArtifactRestriction(ctx, query)
 	case models.EcosystemPub:
 		return dartRestriction(query)
 	case models.EcosystemPackagist:
