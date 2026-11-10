@@ -43,6 +43,10 @@ func isPrivateGoModule(query models.Query) bool {
 
 func (a App) privateGoResult(query models.Query) models.CheckResult {
 	const reason = "Private Go module matches GOPRIVATE; public registry and advisory requests were skipped. Advisory coverage is unavailable."
+	return a.unavailableSourceResult(query, reason)
+}
+
+func (a App) unavailableSourceResult(query models.Query, reason string) models.CheckResult {
 	result := models.CheckResult{
 		Ecosystem: query.Ecosystem, Package: query.Package, Version: query.Version,
 		Recommendation: risk.RecommendationUnknown, Classification: risk.ClassificationUnknown,

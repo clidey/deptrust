@@ -126,9 +126,11 @@ func (e Ecosystem) GitHubEcosystem() string {
 }
 
 type Query struct {
-	Ecosystem Ecosystem `json:"ecosystem"`
-	Package   string    `json:"package"`
-	Version   string    `json:"version,omitempty"`
+	ProjectDir  string    `json:"project_dir,omitempty"`
+	NuGetConfig string    `json:"nuget_config,omitempty"`
+	Ecosystem   Ecosystem `json:"ecosystem"`
+	Package     string    `json:"package"`
+	Version     string    `json:"version,omitempty"`
 }
 
 func (q Query) Validate() error {

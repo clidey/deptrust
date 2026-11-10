@@ -69,6 +69,14 @@ func (a App) CheckPackage(ctx context.Context, query models.Query) (models.Check
 		return a.privateGoResult(query), nil
 	}
 
+	restriction, err := sourceRestriction(ctx, query)
+	if err != nil {
+		return models.CheckResult{}, err
+	}
+	if restriction != "" {
+		return a.unavailableSourceResult(query, restriction), nil
+	}
+
 	resolved, err := a.registry.Resolve(ctx, query)
 	if err != nil {
 		if strings.EqualFold(query.Version, models.LatestVersion) || definitiveRegistryError(err) || ctx.Err() != nil {
@@ -177,7 +185,7 @@ func (a App) SuggestSafeVersion(ctx context.Context, query models.Query) (models
 		SkippedProviders:    latest.SkippedProviders,
 	}
 
-	if isPrivateGoModule(query) {
+	if latest.AdvisoryCoverage == "none" && latest.RegistryVerification == "unverified" {
 		result.LatestVersion = ""
 		result.CheckedVersions = nil
 		result.Recommendation = risk.RecommendationUnknown
