@@ -31,6 +31,8 @@ func javascriptArtifactRestriction(ctx context.Context, q models.Query) (string,
 			return "", fmt.Errorf("cannot read Yarn Classic configuration")
 		}
 		registry := "https://registry.yarnpkg.com"
+		scoped := ""
+		scope, _, _ := strings.Cut(q.Package, "/")
 		scanner := bufio.NewScanner(strings.NewReader(string(data)))
 		for scanner.Scan() {
 			line := strings.TrimSpace(scanner.Text())
@@ -39,15 +41,22 @@ func javascriptArtifactRestriction(ctx context.Context, q models.Query) (string,
 			}
 			fields := strings.Fields(line)
 			key := strings.Trim(fields[0], `"`)
-			if key == "registry" {
+			if key == "registry" || (strings.HasPrefix(scope, "@") && key == scope+":registry") {
 				if len(fields) != 2 {
 					return "", fmt.Errorf("unsupported Yarn Classic registry declaration")
 				}
-				registry = strings.Trim(fields[1], `"`)
+				if key == "registry" {
+					registry = strings.Trim(fields[1], `"`)
+				} else {
+					scoped = strings.Trim(fields[1], `"`)
+				}
 			}
 		}
 		if scanner.Err() != nil {
 			return "", fmt.Errorf("invalid Yarn Classic configuration")
+		}
+		if scoped != "" {
+			registry = scoped
 		}
 		if !publicJSRegistry(registry) {
 			return unsupportedArtifactSource, nil
@@ -70,6 +79,11 @@ func javascriptArtifactRestriction(ctx context.Context, q models.Query) (string,
 				}
 			}
 		} else {
+			for key, value := range table(root["registries"]) {
+				if _, ok := value.(string); !ok || (key != "default" && !strings.HasPrefix(key, "@")) {
+					return unsupportedArtifactSource, nil
+				}
+			}
 			if value := text(root["registry"]); value != "" {
 				registry = value
 			}
