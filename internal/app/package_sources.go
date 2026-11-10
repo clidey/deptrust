@@ -149,9 +149,6 @@ func nugetRestriction(query models.Query) (string, error) {
 	best := -1
 	name := strings.ToLower(query.Package)
 	for _, mapping := range mappings {
-		if _, enabled := sources[mapping.Key]; !enabled {
-			continue
-		}
 		for _, entry := range mapping.Packages {
 			pattern := strings.ToLower(entry.Pattern)
 			if pattern == "" || strings.Count(pattern, "*") > 1 || (strings.Contains(pattern, "*") && !strings.HasSuffix(pattern, "*")) {

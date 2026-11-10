@@ -21,6 +21,7 @@ func TestNuGetSourceMappings(t *testing.T) {
 		{"longest prefix", `<packageSource key="internal"><package pattern="Contoso.*"/></packageSource><packageSource key="public"><package pattern="Contoso.Open.*"/></packageSource>`, "", "Contoso.Open.Lib", false},
 		{"tied sources", `<packageSource key="public"><package pattern="*"/></packageSource><packageSource key="internal"><package pattern="*"/></packageSource>`, "", "Example", true},
 		{"unmapped", `<packageSource key="public"><package pattern="Other"/></packageSource>`, "", "Example", true},
+		{"disabled private mapping cannot fall back", `<packageSource key="public"><package pattern="*"/></packageSource><packageSource key="internal"><package pattern="Contoso.*"/></packageSource>`, `<add key="internal" value="true"/>`, "Contoso.Secret", true},
 		{"disabled", `<packageSource key="public"><package pattern="*"/></packageSource>`, `<add key="public" value="true"/>`, "Example", true},
 		{"no mappings mixed feeds", "", "", "Example", true},
 	} {
