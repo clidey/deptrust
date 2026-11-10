@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -15,9 +16,10 @@ import (
 )
 
 type hookInput struct {
-	Cwd       string                     `json:"cwd"`
-	ToolName  string                     `json:"tool_name"`
-	ToolInput map[string]json.RawMessage `json:"tool_input"`
+	SourceContext models.Query               `json:"source_context"`
+	Cwd           string                     `json:"cwd"`
+	ToolName      string                     `json:"tool_name"`
+	ToolInput     map[string]json.RawMessage `json:"tool_input"`
 }
 
 type claudeHookOutput struct {
@@ -60,12 +62,49 @@ func RunShell(ctx context.Context, service app.App, in io.Reader, out io.Writer)
 			continue
 		}
 
-		if query.Ecosystem == models.EcosystemNPM && input.Cwd != "" {
+		query.ProjectDir = input.SourceContext.ProjectDir
+		query.NuGetConfig = input.SourceContext.NuGetConfig
+		query.BundlerLock = input.SourceContext.BundlerLock
+		query.SourceFile = input.SourceContext.SourceFile
+		if query.ProjectDir == "" && query.NuGetConfig == "" && query.BundlerLock == "" && query.SourceFile == "" && input.Cwd != "" {
 			if !filepath.IsAbs(input.Cwd) {
 				return deny(out, "deptrust requires an absolute hook cwd to check package sources")
 			}
-			query.ProjectDir = input.Cwd
+			switch query.Ecosystem {
+			case models.EcosystemNPM:
+				query.ProjectDir = input.Cwd
+			case models.EcosystemCargo:
+				query.ProjectDir = input.Cwd
+			case models.EcosystemPyPI:
+				for _, file := range []string{"pyproject.toml", "Pipfile"} {
+					candidate := filepath.Join(input.Cwd, file)
+					if _, err := os.Stat(candidate); err == nil {
+						query.SourceFile = candidate
+						break
+					}
+				}
+			case models.EcosystemPackagist:
+				candidate := filepath.Join(input.Cwd, "composer.json")
+				if _, err := os.Stat(candidate); err == nil {
+					query.SourceFile = candidate
+				}
+			case models.EcosystemPub:
+				candidate := filepath.Join(input.Cwd, "pubspec.yaml")
+				if _, err := os.Stat(candidate); err == nil {
+					query.SourceFile = candidate
+				}
+			case models.EcosystemRuby:
+				candidate := filepath.Join(input.Cwd, "Gemfile.lock")
+				if _, err := os.Stat(candidate); err == nil {
+					query.BundlerLock = candidate
+				} else if _, err := os.Stat(filepath.Join(input.Cwd, "Gemfile")); err == nil {
+					return deny(out, "deptrust requires a resolved Bundler lockfile before assessing project gem sources")
+				}
+			case models.EcosystemNuGet, models.EcosystemMaven:
+				return deny(out, "deptrust requires explicit source_context for project NuGet/Maven installs; inherited repositories cannot be inferred from cwd")
+			}
 		}
+
 		result, err := service.CheckPackage(ctx, query)
 		if err != nil {
 			return deny(out, fmt.Sprintf("deptrust could not check %s %s: %v", request.Name, request.Version, err))

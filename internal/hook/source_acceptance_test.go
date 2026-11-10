@@ -53,3 +53,22 @@ func TestHookSourceOverridesStopBeforeLookup(t *testing.T) {
 		}
 	}
 }
+
+func TestHookExplicitSourceContext(t *testing.T) {
+	sourcetest.Guard(t)
+	input := map[string]any{"source_context": map[string]string{"nuget_config": sourcetest.NuGetConfig(t)}, "tool_input": map[string]string{"command": "dotnet add package Company.Secret --version 1.0.0"}}
+	encoded, err := json.Marshal(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := RunShell(context.Background(), app.New(), bytes.NewReader(encoded), &out); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), `"deny"`) || !strings.Contains(out.String(), "unknown") {
+		t.Fatal(out.String())
+	}
+	if strings.Contains(out.String(), "credential-sentinel") {
+		t.Fatal("credential disclosed")
+	}
+}
