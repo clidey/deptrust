@@ -582,7 +582,7 @@ checks continue to use the public registries.
   a scope name or `package.json` publishing restrictions. Private packages hosted
   on registry.npmjs.org cannot be distinguished by registry selection alone.
 - **NuGet:** reads the selected config file alone, like NuGet's explicit
-  `--configfile` mode; machine, user, and parent-directory settings are not merged.
+  `--configfile` mode; machine, user, and parent-directory settings are not merged in this explicit-file mode.
   Use a consolidated config containing package sources and mappings. Exact package
   IDs take precedence over prefixes, longer prefixes over shorter ones, and `*`
   is the default. Matching is case-insensitive. Disabled sources are excluded.
@@ -841,3 +841,21 @@ interpreter; unrecognized commands and source overrides remain documented limits
 
 A consolidated [source support matrix](docs/package-sources.md) lists the
 implemented paths, verification boundaries, and deferred integrations.
+
+### Effective NuGet project configuration
+
+Use `--project-dir /absolute/path/to/solution-directory nuget Package.Name 1.2.3`
+(MCP: `project_dir`) to apply inherited NuGet configuration. DepTrust invokes the
+official `dotnet nuget config paths` command, reads its ordered machine/user/parent
+file list, and applies collection clears/removals, source-key overrides, disabled
+sources, mapping precedence, and `%ENVIRONMENT_VARIABLE%` source URLs. The selected
+directory is the restore context; choose the solution or project directory used
+by your actual restore. The installed .NET SDK must support that command.
+
+No restore or project evaluation runs during source discovery. Tests compare
+merge decisions against the NuGet.Configuration assemblies shipped with the SDK,
+including replacement of a source's pattern list by a child config. Discovery
+errors stop public requests. `--nuget-config` retains NuGet's standalone-file mode.
+Hooks can use their absolute cwd for effective NuGet context.
+
+Reference: [official NuGet configuration hierarchy](https://learn.microsoft.com/en-us/nuget/consume-packages/configuring-nuget-behavior/).

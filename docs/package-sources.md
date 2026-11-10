@@ -17,7 +17,7 @@ Do not use an incomplete snapshot to establish an effective private/public bound
 | uv | Selected project index constraints or uv.lock sources | No complete environment/global/project/CLI merge; custom recognized index environment stops public checks |
 | Pipenv | Selected Pipfile/Pipfile.lock indexes | Missing lock sources are unknown; no complete runtime/global override reconstruction |
 | pip | Selected pip.conf/pip.ini global/install indexes; recognized environment | No complete global/user/site/CLI hierarchy reconstruction |
-| NuGet | Selected standalone config, mapping specificity, ordered source collections | No machine/user/parent config inheritance; unsupported nested mapping operations fail |
+| NuGet | Standalone config or effective .NET CLI-discovered hierarchy, mapping specificity, collection operations, source environment URLs | Requires a .NET SDK with config paths for hierarchy; directory must match restore context; unsupported mapping directives fail |
 | Cargo | Offline metadata, locked resolved-source confirmation | Public checks require lock/cache; rustup auto-install is disabled; no arbitrary transitive-source query; alternate identities remain unknown |
 | Bundler | Selected lockfile GEM sources, safe separation from foreign sources | No Gemfile evaluation/freshness/local overrides; Git/path/plugin gems remain unknown |
 | Composer | Selected root repository declarations, only/exclude filters | No global/environment/plugin merge; cannot infer repository identity from lock download URLs |
@@ -37,7 +37,7 @@ Do not use an incomplete snapshot to establish an effective private/public bound
   reject application HTTP requests across all native artifact readers.
 - Follow-up commands preserve the selector. Credential sentinels must not appear
   in results. Source selectors are mutually exclusive.
-- Hooks accept explicit source_context; cwd enables effective npm/Cargo checks.
+- Hooks accept explicit source_context; cwd enables effective npm/Cargo/NuGet checks.
   Other project managers require explicit context, and recognized source-override
   command flags stop the hook before public requests. Hook command parsing is not
   a complete shell interpreter.

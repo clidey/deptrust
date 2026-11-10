@@ -69,6 +69,8 @@ func sourceRestriction(ctx context.Context, query models.Query) (string, error) 
 			return "", fmt.Errorf("project_dir must be absolute")
 		}
 		switch query.Ecosystem {
+		case models.EcosystemNuGet:
+			return nugetProjectRestriction(ctx, query)
 		case models.EcosystemNPM:
 			registry, err := npmRegistry(ctx, query)
 			if err != nil {
@@ -82,7 +84,7 @@ func sourceRestriction(ctx context.Context, query models.Query) (string, error) 
 		case models.EcosystemPyPI:
 			return poetryRestriction(ctx, query)
 		default:
-			return "", fmt.Errorf("project_dir is supported for npm, Cargo, and Poetry; use nuget_config for NuGet")
+			return "", fmt.Errorf("project_dir is supported for npm, Cargo, Poetry, and NuGet")
 		}
 	}
 	if query.NuGetConfig != "" {
@@ -145,9 +147,13 @@ func nugetRestriction(query models.Query) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	return nugetSourceRestriction(query.Package, sources, mappings)
+}
+
+func nugetSourceRestriction(packageName string, sources map[string]string, mappings []nugetSourceMapping) (string, error) {
 	selected := map[string]bool{}
 	best := -1
-	name := strings.ToLower(query.Package)
+	name := strings.ToLower(packageName)
 	for _, mapping := range mappings {
 		for _, entry := range mapping.Packages {
 			pattern := strings.ToLower(entry.Pattern)

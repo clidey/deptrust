@@ -74,6 +74,8 @@ func RunShell(ctx context.Context, service app.App, in io.Reader, out io.Writer)
 				query.ProjectDir = input.Cwd
 			case models.EcosystemCargo:
 				query.ProjectDir = input.Cwd
+			case models.EcosystemNuGet:
+				query.ProjectDir = input.Cwd
 			case models.EcosystemGo:
 				// GOPRIVATE is read by the app independently of project targeting.
 			default:
