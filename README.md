@@ -787,3 +787,14 @@ generation was not tested. The selected plan is not freshness/provenance proof.
 
 References: [Cabal external plan artifact](https://cabal.readthedocs.io/en/stable/nix-local-build.html),
 [official plan writer](https://github.com/haskell/cabal/blob/master/cabal-install/src/Distribution/Client/ProjectPlanOutput.hs).
+
+### CocoaPods locked sources
+
+For CocoaPods, `source_file` accepts `Podfile.lock`. `SPEC REPOS` associates root
+pod names with trunk/the public Specs repository or custom repositories.
+`EXTERNAL SOURCES` takes precedence and returns `unknown`; mixed or missing
+source assignments do too. Query root pod names, not subspec names. The selected
+lockfile does not verify Podfile freshness, local repository configuration, or
+installed artifact provenance. No Podfile or Ruby project code is evaluated.
+
+Reference: [official CocoaPods lockfile implementation](https://github.com/CocoaPods/Core/blob/master/lib/cocoapods-core/lockfile.rb).
