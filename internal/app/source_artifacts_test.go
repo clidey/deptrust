@@ -75,6 +75,7 @@ func TestJavaScriptManagerSources(t *testing.T) {
 		{".yarnrc.yml", "npmScopes:\n  company:\n    npmRegistryServer: https://private.invalid\n", true},
 		{"pnpm-workspace.yaml", "registry: https://private.invalid\n", true},
 		{"pnpm-workspace.yaml", "registries:\n  '@company': https://private.invalid\n", true},
+		{".yarnrc", "--install.registry \"https://private.invalid\"\n", true},
 		{".yarnrc", "\"@company:registry\" \"https://private.invalid\"\n", true},
 		{"pnpm-workspace.yaml", "registries:\n  'https://private.invalid/':\n    scopes: ['@company']\n", true},
 		{".yarnrc", "registry \"https://registry.yarnpkg.com\"\n", false},

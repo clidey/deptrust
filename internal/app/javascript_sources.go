@@ -41,6 +41,9 @@ func javascriptArtifactRestriction(ctx context.Context, q models.Query) (string,
 			}
 			fields := strings.Fields(line)
 			key := strings.Trim(fields[0], `"`)
+			if strings.Contains(strings.ToLower(key), "registry") && key != "registry" && !strings.HasSuffix(key, ":registry") {
+				return unsupportedArtifactSource, nil
+			}
 			if key == "registry" || (strings.HasPrefix(scope, "@") && key == scope+":registry") {
 				if len(fields) != 2 {
 					return "", fmt.Errorf("unsupported Yarn Classic registry declaration")
