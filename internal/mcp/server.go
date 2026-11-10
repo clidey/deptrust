@@ -9,6 +9,8 @@ import (
 
 	"github.com/clidey/deptrust/internal/app"
 	"github.com/clidey/deptrust/internal/buildinfo"
+	"github.com/clidey/deptrust/internal/models"
+	"strings"
 )
 
 const protocolVersion = "2025-11-25"
@@ -29,6 +31,9 @@ const serverInstructions = "Use this server to vet dependencies for known vulner
 	"Recommendations: 'block' = do not install that version; 'review' = ask the user or pick a safer version; " +
 	"'allow' = no blocking known vulnerability found; 'unknown' = provider failure, unavailable registry verification, or incomplete assessment, do NOT treat as safe. " +
 	"When reporting back, include the package, version, recommendation, and the highest-severity advisory IDs found. " +
+	"For npm project checks pass absolute project_dir; this reads effective npm registry settings and requires npm. " +
+	"For NuGet pass absolute nuget_config; that file is used alone, without inherited settings. " +
+	"Custom or ambiguous sources return unknown without public requests. Always retain these arguments in follow-up calls. " +
 	"Boundaries: this checks known public advisories and registry metadata; it does not prove a package is safe, " +
 	"download tarballs, or detect all malware. " +
 	"For GitHub API rate limits, CI should pass a short-lived least-privilege GitHub App token via DEPTRUST_GITHUB_TOKEN; " +
@@ -64,17 +69,23 @@ type toolCallParams struct {
 }
 
 type checkArgs struct {
-	Ecosystem string `json:"ecosystem"`
-	Package   string `json:"package"`
-	Version   string `json:"version,omitempty"`
+	ProjectDir  string `json:"project_dir,omitempty"`
+	NuGetConfig string `json:"nuget_config,omitempty"`
+	Ecosystem   string `json:"ecosystem"`
+	Package     string `json:"package"`
+	Version     string `json:"version,omitempty"`
 }
 
 type suggestArgs struct {
-	Ecosystem string `json:"ecosystem"`
-	Package   string `json:"package"`
+	ProjectDir  string `json:"project_dir,omitempty"`
+	NuGetConfig string `json:"nuget_config,omitempty"`
+	Ecosystem   string `json:"ecosystem"`
+	Package     string `json:"package"`
 }
 
 type compareArgs struct {
+	ProjectDir  string `json:"project_dir,omitempty"`
+	NuGetConfig string `json:"nuget_config,omitempty"`
 	Ecosystem   string `json:"ecosystem"`
 	Package     string `json:"package"`
 	FromVersion string `json:"from_version"`
@@ -156,11 +167,14 @@ func callTool(ctx context.Context, service app.App, req request) response {
 		if err != nil {
 			return toolError(req.ID, err.Error())
 		}
+		query.ProjectDir = args.ProjectDir
+		query.NuGetConfig = args.NuGetConfig
 		result, err := service.CheckPackage(ctx, query)
 		if err != nil {
 			return toolError(req.ID, err.Error())
 		}
 		compact := compactCheck(result)
+		compact.FullResponseCommand = sourceCommand(compact.FullResponseCommand, query)
 		return toolResult(req.ID, compactToolText(result.Summary, compact.FullResponseCommand), compact)
 	case "suggest_safe_version":
 		var args suggestArgs
@@ -171,11 +185,14 @@ func callTool(ctx context.Context, service app.App, req request) response {
 		if err != nil {
 			return toolError(req.ID, err.Error())
 		}
+		query.ProjectDir = args.ProjectDir
+		query.NuGetConfig = args.NuGetConfig
 		result, err := service.SuggestSafeVersion(ctx, query)
 		if err != nil {
 			return toolError(req.ID, err.Error())
 		}
 		compact := compactSuggest(result)
+		compact.FullResponseCommand = sourceCommand(compact.FullResponseCommand, query)
 		return toolResult(req.ID, compactToolText(result.Summary, compact.FullResponseCommand), compact)
 	case "compare_versions":
 		var args compareArgs
@@ -186,11 +203,14 @@ func callTool(ctx context.Context, service app.App, req request) response {
 		if err != nil {
 			return toolError(req.ID, err.Error())
 		}
+		query.ProjectDir = args.ProjectDir
+		query.NuGetConfig = args.NuGetConfig
 		result, err := service.CompareVersions(ctx, query, args.FromVersion, args.ToVersion)
 		if err != nil {
 			return toolError(req.ID, err.Error())
 		}
 		compact := compactCompare(result)
+		compact.FullResponseCommand = sourceCommand(compact.FullResponseCommand, query)
 		return toolResult(req.ID, compactToolText(result.Summary, compact.FullResponseCommand), compact)
 	default:
 		return toolError(req.ID, fmt.Sprintf("unknown tool %q", params.Name))
@@ -242,6 +262,8 @@ func tools() []map[string]any {
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
+					"project_dir":  map[string]any{"type": "string", "description": "Absolute npm project directory. Uses npm effective registry configuration; requires npm. Custom sources return unknown without public requests."},
+					"nuget_config": map[string]any{"type": "string", "description": "Absolute nuget.config file, used alone without configuration inheritance. Applies official package source mappings before public requests."},
 					"ecosystem": map[string]any{
 						"type":        "string",
 						"description": ecosystemDescription,
@@ -265,6 +287,8 @@ func tools() []map[string]any {
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
+					"project_dir":  map[string]any{"type": "string", "description": "Absolute npm project directory. Uses npm effective registry configuration; requires npm. Custom sources return unknown without public requests."},
+					"nuget_config": map[string]any{"type": "string", "description": "Absolute nuget.config file, used alone without configuration inheritance. Applies official package source mappings before public requests."},
 					"ecosystem": map[string]any{
 						"type":        "string",
 						"description": ecosystemDescription,
@@ -284,6 +308,8 @@ func tools() []map[string]any {
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
+					"project_dir":  map[string]any{"type": "string", "description": "Absolute npm project directory. Uses npm effective registry configuration; requires npm. Custom sources return unknown without public requests."},
+					"nuget_config": map[string]any{"type": "string", "description": "Absolute nuget.config file, used alone without configuration inheritance. Applies official package source mappings before public requests."},
 					"ecosystem": map[string]any{
 						"type":        "string",
 						"description": ecosystemDescription,
@@ -312,6 +338,8 @@ func checkOutputSchema() map[string]any {
 	return map[string]any{
 		"type": "object",
 		"properties": map[string]any{
+			"project_dir":                   map[string]any{"type": "string", "description": "Absolute npm project directory. Uses npm effective registry configuration; requires npm. Custom sources return unknown without public requests."},
+			"nuget_config":                  map[string]any{"type": "string", "description": "Absolute nuget.config file, used alone without configuration inheritance. Applies official package source mappings before public requests."},
 			"ecosystem":                     map[string]any{"type": "string"},
 			"package":                       map[string]any{"type": "string"},
 			"version":                       map[string]any{"type": "string"},
@@ -338,4 +366,22 @@ func checkOutputSchema() map[string]any {
 			"full_response_command":         map[string]any{"type": "string"},
 		},
 	}
+}
+
+func sourceCommand(full string, query models.Query) string {
+	flags := ""
+	if query.ProjectDir != "" {
+		flags += " --project-dir " + shellQuote(query.ProjectDir)
+	}
+	if query.NuGetConfig != "" {
+		flags += " --nuget-config " + shellQuote(query.NuGetConfig)
+	}
+	if flags == "" {
+		return full
+	}
+	parts := strings.SplitN(full, " ", 3)
+	if len(parts) != 3 {
+		return ""
+	}
+	return parts[0] + " " + parts[1] + flags + " " + parts[2]
 }

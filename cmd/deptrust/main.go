@@ -203,12 +203,14 @@ func runCheck(ctx context.Context, service app.App, args []string, stdout io.Wri
 	flags := flag.NewFlagSet("check", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	jsonOutput := flags.Bool("json", false, "emit JSON")
+	projectDir := flags.String("project-dir", "", "absolute npm project directory")
+	nugetConfig := flags.String("nuget-config", "", "absolute NuGet configuration file (used alone)")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
 	remaining := flags.Args()
 	if len(remaining) < 2 || len(remaining) > 3 {
-		return errors.New("usage: deptrust check [--json] <ecosystem> <package> [version|latest]")
+		return errors.New("usage: deptrust check [--json] [--project-dir <absolute-dir> | --nuget-config <absolute-file>] <ecosystem> <package> [version|latest]")
 	}
 
 	version := ""
@@ -220,6 +222,8 @@ func runCheck(ctx context.Context, service app.App, args []string, stdout io.Wri
 		return err
 	}
 
+	query.ProjectDir = *projectDir
+	query.NuGetConfig = *nugetConfig
 	result, err := service.CheckPackage(ctx, query)
 	if err != nil {
 		return err
@@ -235,18 +239,22 @@ func runSuggest(ctx context.Context, service app.App, args []string, stdout io.W
 	flags := flag.NewFlagSet("suggest", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	jsonOutput := flags.Bool("json", false, "emit JSON")
+	projectDir := flags.String("project-dir", "", "absolute npm project directory")
+	nugetConfig := flags.String("nuget-config", "", "absolute NuGet configuration file (used alone)")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
 	remaining := flags.Args()
 	if len(remaining) != 2 {
-		return errors.New("usage: deptrust suggest [--json] <ecosystem> <package>")
+		return errors.New("usage: deptrust suggest [--json] [--project-dir <absolute-dir> | --nuget-config <absolute-file>] <ecosystem> <package>")
 	}
 
 	query, err := app.ParseQuery(remaining[0], remaining[1], "")
 	if err != nil {
 		return err
 	}
+	query.ProjectDir = *projectDir
+	query.NuGetConfig = *nugetConfig
 	result, err := service.SuggestSafeVersion(ctx, query)
 	if err != nil {
 		return err
@@ -262,18 +270,22 @@ func runCompare(ctx context.Context, service app.App, args []string, stdout io.W
 	flags := flag.NewFlagSet("compare", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	jsonOutput := flags.Bool("json", false, "emit JSON")
+	projectDir := flags.String("project-dir", "", "absolute npm project directory")
+	nugetConfig := flags.String("nuget-config", "", "absolute NuGet configuration file (used alone)")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
 	remaining := flags.Args()
 	if len(remaining) != 4 {
-		return errors.New("usage: deptrust compare [--json] <ecosystem> <package> <from-version> <to-version>")
+		return errors.New("usage: deptrust compare [--json] [--project-dir <absolute-dir> | --nuget-config <absolute-file>] <ecosystem> <package> <from-version> <to-version>")
 	}
 
 	query, err := app.ParseQuery(remaining[0], remaining[1], "")
 	if err != nil {
 		return err
 	}
+	query.ProjectDir = *projectDir
+	query.NuGetConfig = *nugetConfig
 	result, err := service.CompareVersions(ctx, query, remaining[2], remaining[3])
 	if err != nil {
 		return err
@@ -304,9 +316,9 @@ func printUsage(w io.Writer) {
 deptrust checks package versions for known vulnerabilities.
 
 Usage:
-  deptrust check [--json] <ecosystem> <package> [version|latest]
-  deptrust suggest [--json] <ecosystem> <package>
-  deptrust compare [--json] <ecosystem> <package> <from-version> <to-version>
+  deptrust check [--json] [--project-dir <absolute-dir> | --nuget-config <absolute-file>] <ecosystem> <package> [version|latest]
+  deptrust suggest [--json] [--project-dir <absolute-dir> | --nuget-config <absolute-file>] <ecosystem> <package>
+  deptrust compare [--json] [--project-dir <absolute-dir> | --nuget-config <absolute-file>] <ecosystem> <package> <from-version> <to-version>
   deptrust mcp
   deptrust setup [--codex-mcp] [--claude-code-mcp]
   deptrust hook tool
