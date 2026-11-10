@@ -80,3 +80,21 @@ goals; Gradle executes an inspection task and may run configuration-time code.
 These integrations are for trusted projects and are not filesystem/network
 sandboxes for arbitrary project code. Authenticated private endpoint fetching
 and advisory-provider integration remain separate from source classification.
+
+Run `python3 scripts/test-source-runtime.py` to require all NuGet, Maven,
+Gradle, Mix, and built-process tests. It fails if a required test is missing or
+skipped. Install Go, .NET SDK 10+, a compatible JDK/Maven/Gradle, npm, Cargo,
+Ruby/Bundler, and Elixir first. Alternatively, pull the official Elixir image
+pinned in `.github/workflows/ci.yml` and set `DEPTRUST_TEST_ELIXIR_IMAGE` to it;
+Docker is then required. The Ubuntu 24.04 CI runtime job uses the runner's
+installed toolchains and pulls that image before running tests. Runner software
+versions are printed in the job; a GitHub Actions run verifies that environment.
+
+The process suite builds the real CLI with the race detector, checks private
+source decisions through CLI and stdio MCP, and executes generated follow-up
+commands through `sh`, including paths with spaces and apostrophes. It checks
+for credential disclosure, artifact mutation, and unexpected HTTP requests using
+local proxy/repository tripwires. It also exercises quoted hook override flags.
+These checks complement in-process HTTP guards; they do not sandbox project code
+or authenticate to private registries. Gradle's public runtime fixture warms an
+isolated dependency metadata cache online before exercising offline inspection.

@@ -3,33 +3,17 @@ package app
 import (
 	"context"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"testing"
 
 	"github.com/clidey/deptrust/internal/models"
+	"github.com/clidey/deptrust/internal/sourcetest"
 )
 
 func TestMixLockSourcesWithoutEvaluation(t *testing.T) {
 	fixtures := t.TempDir()
-	if _, err := exec.LookPath("elixir"); err != nil {
-		if os.Getenv("DEPTRUST_TEST_ELIXIR_IMAGE") == "" {
-			t.Skip("Elixir or an explicitly supplied cached official test image is required")
-		}
-		if _, err := exec.LookPath("docker"); err != nil {
-			t.Fatal("Docker required for explicit container oracle")
-		}
-		tools := t.TempDir()
-		wrapper := `#!/bin/sh
-exec docker run --rm --pull=never --network=none --read-only --tmpfs /tmp --mount "type=bind,source=$DEPTRUST_TEST_MIX_FIXTURES,target=$DEPTRUST_TEST_MIX_FIXTURES,readonly" "$DEPTRUST_TEST_ELIXIR_IMAGE" elixir "$@"
-`
-		if err := os.WriteFile(filepath.Join(tools, "elixir"), []byte(wrapper), 0700); err != nil {
-			t.Fatal(err)
-		}
-		t.Setenv("PATH", tools+string(os.PathListSeparator)+os.Getenv("PATH"))
-		t.Setenv("DEPTRUST_TEST_MIX_FIXTURES", fixtures)
-	}
+	sourcetest.Elixir(t, fixtures)
 	marker := filepath.Join(fixtures, "executed")
 	for _, tt := range []struct {
 		name, lock string

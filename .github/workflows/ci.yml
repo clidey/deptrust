@@ -70,3 +70,32 @@ jobs:
 
       - name: Check npm package
         run: npm pack --dry-run
+
+  source-runtime:
+    name: Source runtime and process E2E
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      # Official Elixir image; parser tests run it offline with read-only fixtures.
+      DEPTRUST_TEST_ELIXIR_IMAGE: elixir@sha256:b0082436839969c6eac09ee99515980322d8ecadd302ff7b9fd6547aa24cddf9
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
+      DOTNET_NOLOGO: '1'
+      DOTNET_GENERATE_ASPNET_CERTIFICATE: 'false'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Check runner toolchains
+        # Ubuntu 24.04 includes .NET SDK, JDK, Maven, Gradle, Python and Docker.
+        run: |
+          dotnet --version
+          java -version
+          mvn --version
+          gradle --version
+          docker pull "$DEPTRUST_TEST_ELIXIR_IMAGE"
+      - name: Test required runtimes and built CLI/MCP
+        run: python3 scripts/test-source-runtime.py
