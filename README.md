@@ -774,3 +774,16 @@ export/integration; it is not inferred from Maven coordinates.
 References: [Maven repository order](https://maven.apache.org/guides/mini/guide-multiple-repositories),
 [effective artifacts](https://maven.apache.org/plugins/maven-help-plugin/usage.html),
 [Gradle exclusive content](https://docs.gradle.org/current/userguide/filtering_repository_content.html).
+
+### Cabal resolved plans
+
+For Hackage, `source_file` accepts Cabal's `dist-newstyle/cache/plan.json`.
+Only matching `repo-tar` packages whose recorded repository URI is HTTPS
+hackage.haskell.org proceed to public checks. Local, source-repository, tarball,
+custom-repository, missing-source, and unlisted packages return `unknown`.
+The parser follows Cabal's official plan writer; fixtures cover those shapes.
+Cabal is not installed in the local verification environment, so fresh plan
+generation was not tested. The selected plan is not freshness/provenance proof.
+
+References: [Cabal external plan artifact](https://cabal.readthedocs.io/en/stable/nix-local-build.html),
+[official plan writer](https://github.com/haskell/cabal/blob/master/cabal-install/src/Distribution/Client/ProjectPlanOutput.hs).
