@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -16,6 +17,7 @@ func cargoRestriction(ctx context.Context, query models.Query) (string, error) {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "cargo", "metadata", "--format-version", "1", "--no-deps", "--offline")
 	cmd.Dir = query.ProjectDir
+	cmd.Env = append(os.Environ(), "RUSTUP_AUTO_INSTALL=0")
 	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("cannot read offline Cargo metadata for project")
@@ -28,6 +30,7 @@ func cargoRestriction(ctx context.Context, query models.Query) (string, error) {
 	// from the locked graph before allowing a public assessment.
 	resolved := exec.CommandContext(ctx, "cargo", "metadata", "--format-version", "1", "--offline", "--locked")
 	resolved.Dir = query.ProjectDir
+	resolved.Env = append(os.Environ(), "RUSTUP_AUTO_INSTALL=0")
 	out, err = resolved.Output()
 	if err != nil {
 		return "", fmt.Errorf("cannot verify locked Cargo sources offline; a current lockfile and cached dependency metadata are required")

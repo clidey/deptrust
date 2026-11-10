@@ -2,9 +2,12 @@ package app
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 
 	"github.com/clidey/deptrust/internal/models"
@@ -175,5 +178,40 @@ func TestPoetryInvalidConfigurationStopsLookup(t *testing.T) {
 		if _, err := (App{}).CheckPackage(context.Background(), models.Query{Ecosystem: models.EcosystemPyPI, Package: "secret", ProjectDir: dir}); err == nil {
 			t.Fatal("expected error before lookup")
 		}
+	}
+}
+
+func TestCargoDoesNotDownloadMissingToolchain(t *testing.T) {
+	cargo, err := exec.LookPath("cargo")
+	if err != nil {
+		t.Skip("Cargo not installed")
+	}
+	rustup, err := exec.LookPath("rustup")
+	if err != nil {
+		t.Skip("rustup not installed")
+	}
+	cargoInfo, err := os.Stat(cargo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rustupInfo, err := os.Stat(rustup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !os.SameFile(cargoInfo, rustupInfo) {
+		t.Skip("Cargo is not a rustup proxy")
+	}
+	var calls atomic.Int64
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { calls.Add(1); w.WriteHeader(502) }))
+	defer server.Close()
+	t.Setenv("RUSTUP_TOOLCHAIN", "1.999.0")
+	t.Setenv("RUSTUP_DIST_SERVER", server.URL)
+	t.Setenv("RUSTUP_AUTO_INSTALL", "1")
+	q := models.Query{Ecosystem: models.EcosystemCargo, Package: "secret", ProjectDir: t.TempDir()}
+	if _, err := sourceRestriction(context.Background(), q); err == nil {
+		t.Fatal("missing toolchain should stop check")
+	}
+	if calls.Load() != 0 {
+		t.Fatal("attempted toolchain download")
 	}
 }
