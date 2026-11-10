@@ -72,3 +72,19 @@ func TestHookExplicitSourceContext(t *testing.T) {
 		t.Fatal("credential disclosed")
 	}
 }
+
+func TestHookCannotGuessInheritedSources(t *testing.T) {
+	sourcetest.Guard(t)
+	input := map[string]any{"cwd": t.TempDir(), "tool_input": map[string]string{"command": "pip install secret==1.0.0"}}
+	encoded, err := json.Marshal(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := RunShell(context.Background(), app.New(), bytes.NewReader(encoded), &out); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), `"deny"`) || !strings.Contains(out.String(), "source_context") {
+		t.Fatal(out.String())
+	}
+}

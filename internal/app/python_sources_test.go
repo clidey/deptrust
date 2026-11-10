@@ -23,6 +23,7 @@ func TestPythonSourceArtifacts(t *testing.T) {
 		{"pyproject.toml", "[project]\ndependencies=['secret']\n[tool.uv]\n", false},
 		{"Pipfile", "[[source]]\nname='private'\nurl='https://private.invalid/simple'\n[packages]\nsecret={version='*',index='private'}\n", true},
 		{"Pipfile.lock", `{"_meta":{"sources":[{"name":"pypi","url":"https://pypi.org/simple"}]},"default":{"secret":{"version":"==1"}}}`, false},
+		{"Pipfile.lock", `{"default":{"secret":{"version":"==1"}}}`, true},
 		{"pip.conf", "[global]\nindex-url=https://private.invalid/simple\n", true},
 		{"pip.conf", "[global]\nindex-url=https://private.invalid/simple\n[install]\nindex-url=https://pypi.org/simple\n", false},
 	} {

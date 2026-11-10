@@ -105,6 +105,8 @@ func TestNPMEffectiveRegistry(t *testing.T) {
 
 func TestNuGetUnsupportedDirectivesStopLookup(t *testing.T) {
 	for _, body := range []string{
+		`<packageSourceMapping><packageSource key="public"><clear/><package pattern="*"/></packageSource></packageSourceMapping>`,
+
 		`<packageSources/><packageSources/>`,
 		`<packageSources>`,
 	} {
