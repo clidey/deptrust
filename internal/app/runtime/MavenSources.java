@@ -28,8 +28,13 @@ public final class MavenSources extends AbstractMavenLifecycleParticipant {
             }
             if (!matches) continue;
             for (RemoteRepository repository : project.getRemoteProjectRepositories()) {
-                RemoteRepository mirror = session.getRepositorySession().getMirrorSelector().getMirror(repository);
-                report.setProperty("source." + index++, (mirror == null ? repository : mirror).getUrl());
+                // Maven may already have applied a mirror while building the project.
+                // Never apply mirror selection recursively to that mirror's ID.
+                RemoteRepository mirror = repository.getMirroredRepositories().isEmpty()
+                    ? session.getRepositorySession().getMirrorSelector().getMirror(repository) : null;
+                RemoteRepository effective = mirror == null ? repository : mirror;
+                if (effective.isBlocked()) unsupported = true;
+                report.setProperty("source." + index++, effective.getUrl());
             }
         }
         report.setProperty("declared", Boolean.toString(declared && !unsupported));

@@ -32,6 +32,8 @@ func TestEffectiveMavenProjectSources(t *testing.T) {
 		{"public", "", "", false},
 		{"profile repository", "", `<profiles><profile><id>internal</id><repositories><repository><id>internal</id><url>` + server.URL + `</url></repository></repositories></profile></profiles><activeProfiles><activeProfile>internal</activeProfile></activeProfiles>`, true},
 		{"mirrored public", "", `<mirrors><mirror><id>internal</id><mirrorOf>*</mirrorOf><url>` + server.URL + `</url></mirror></mirrors>`, true},
+		{"blocked public endpoint", "", `<mirrors><mirror><id>blocked</id><mirrorOf>central</mirrorOf><url>https://repo.maven.apache.org/maven2</url><blocked>true</blocked></mirror></mirrors>`, true},
+		{"mirror is applied once", "", `<mirrors><mirror><id>internal</id><mirrorOf>central</mirrorOf><url>` + server.URL + `</url></mirror><mirror><id>second</id><mirrorOf>internal</mirrorOf><url>https://repo.maven.apache.org/maven2</url></mirror></mirrors>`, true},
 		{"project repository", `<repositories><repository><id>private</id><url>` + server.URL + `</url></repository></repositories>`, "", true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
