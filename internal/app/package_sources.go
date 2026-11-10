@@ -19,8 +19,20 @@ import (
 // sourceRestriction checks only explicitly selected package-manager configuration.
 // Configuration failures stop assessment before any public request.
 func sourceRestriction(ctx context.Context, query models.Query) (string, error) {
-	if (query.ProjectDir != "" && query.NuGetConfig != "") || (query.BundlerLock != "" && (query.ProjectDir != "" || query.NuGetConfig != "")) {
-		return "", fmt.Errorf("select only one of project_dir, nuget_config, or bundler_lock")
+	selected := 0
+	for _, value := range []string{query.ProjectDir, query.NuGetConfig, query.BundlerLock, query.SourceFile} {
+		if value != "" {
+			selected++
+		}
+	}
+	if selected > 1 {
+		return "", fmt.Errorf("select only one source context")
+	}
+	if query.SourceFile != "" {
+		if !filepath.IsAbs(query.SourceFile) {
+			return "", fmt.Errorf("source_file must be absolute")
+		}
+		return artifactRestriction(ctx, query)
 	}
 
 	if query.BundlerLock != "" {

@@ -682,3 +682,20 @@ Hook source checks use an absolute hook `cwd` for npm configuration. Install
 commands with explicit registry/index/configuration/directory overrides stop
 before public requests because the hook cannot reliably reconstruct those
 sources. Use the explicit source-aware CLI/MCP interface for those assessments.
+
+### Composer repository declarations
+
+Use `--source-file /absolute/path/to/composer.json` (MCP: `source_file`) to assess
+repository declarations in the selected root artifact. Custom repositories that
+can supply the package return `unknown`, including noncanonical repositories;
+`only` and `exclude` wildcard filters are respected. Disabling Packagist also
+returns `unknown`. A VCS/dist URL in composer.lock is not treated as proof that a
+package came from Packagist. No Composer scripts or plugins run.
+
+This is a selected-file assessment: it does not merge Composer's global config,
+environment overrides, or plugins. Use a configuration artifact representing the
+intended sources. It does not prove the freshness or provenance of installed
+packages. Source context options are mutually exclusive.
+
+Official references: [Composer repositories](https://getcomposer.org/doc/05-repositories.md),
+[repository priority and filters](https://getcomposer.org/doc/articles/repository-priorities.md).

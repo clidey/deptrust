@@ -204,6 +204,7 @@ func runCheck(ctx context.Context, service app.App, args []string, stdout io.Wri
 	flags.SetOutput(io.Discard)
 	jsonOutput := flags.Bool("json", false, "emit JSON")
 	projectDir := flags.String("project-dir", "", "absolute npm, Cargo, or Poetry project directory")
+	sourceFile := flags.String("source-file", "", "absolute official source configuration or lock artifact")
 	bundlerLock := flags.String("bundler-lock", "", "absolute Gemfile.lock to inspect resolved gem sources")
 	nugetConfig := flags.String("nuget-config", "", "absolute NuGet configuration file (used alone)")
 	if err := flags.Parse(args); err != nil {
@@ -211,7 +212,7 @@ func runCheck(ctx context.Context, service app.App, args []string, stdout io.Wri
 	}
 	remaining := flags.Args()
 	if len(remaining) < 2 || len(remaining) > 3 {
-		return errors.New("usage: deptrust check [--json] [--project-dir <absolute-dir> | --nuget-config <absolute-file> | --bundler-lock <absolute-lockfile>] <ecosystem> <package> [version|latest]")
+		return errors.New("usage: deptrust check [--json] [--project-dir <absolute-dir> | --nuget-config <absolute-file> | --bundler-lock <absolute-lockfile> | --source-file <absolute-file>] <ecosystem> <package> [version|latest]")
 	}
 
 	version := ""
@@ -226,6 +227,7 @@ func runCheck(ctx context.Context, service app.App, args []string, stdout io.Wri
 	query.ProjectDir = *projectDir
 	query.NuGetConfig = *nugetConfig
 	query.BundlerLock = *bundlerLock
+	query.SourceFile = *sourceFile
 	result, err := service.CheckPackage(ctx, query)
 	if err != nil {
 		return err
@@ -242,6 +244,7 @@ func runSuggest(ctx context.Context, service app.App, args []string, stdout io.W
 	flags.SetOutput(io.Discard)
 	jsonOutput := flags.Bool("json", false, "emit JSON")
 	projectDir := flags.String("project-dir", "", "absolute npm, Cargo, or Poetry project directory")
+	sourceFile := flags.String("source-file", "", "absolute official source configuration or lock artifact")
 	bundlerLock := flags.String("bundler-lock", "", "absolute Gemfile.lock to inspect resolved gem sources")
 	nugetConfig := flags.String("nuget-config", "", "absolute NuGet configuration file (used alone)")
 	if err := flags.Parse(args); err != nil {
@@ -249,7 +252,7 @@ func runSuggest(ctx context.Context, service app.App, args []string, stdout io.W
 	}
 	remaining := flags.Args()
 	if len(remaining) != 2 {
-		return errors.New("usage: deptrust suggest [--json] [--project-dir <absolute-dir> | --nuget-config <absolute-file> | --bundler-lock <absolute-lockfile>] <ecosystem> <package>")
+		return errors.New("usage: deptrust suggest [--json] [--project-dir <absolute-dir> | --nuget-config <absolute-file> | --bundler-lock <absolute-lockfile> | --source-file <absolute-file>] <ecosystem> <package>")
 	}
 
 	query, err := app.ParseQuery(remaining[0], remaining[1], "")
@@ -259,6 +262,7 @@ func runSuggest(ctx context.Context, service app.App, args []string, stdout io.W
 	query.ProjectDir = *projectDir
 	query.NuGetConfig = *nugetConfig
 	query.BundlerLock = *bundlerLock
+	query.SourceFile = *sourceFile
 	result, err := service.SuggestSafeVersion(ctx, query)
 	if err != nil {
 		return err
@@ -275,6 +279,7 @@ func runCompare(ctx context.Context, service app.App, args []string, stdout io.W
 	flags.SetOutput(io.Discard)
 	jsonOutput := flags.Bool("json", false, "emit JSON")
 	projectDir := flags.String("project-dir", "", "absolute npm, Cargo, or Poetry project directory")
+	sourceFile := flags.String("source-file", "", "absolute official source configuration or lock artifact")
 	bundlerLock := flags.String("bundler-lock", "", "absolute Gemfile.lock to inspect resolved gem sources")
 	nugetConfig := flags.String("nuget-config", "", "absolute NuGet configuration file (used alone)")
 	if err := flags.Parse(args); err != nil {
@@ -282,7 +287,7 @@ func runCompare(ctx context.Context, service app.App, args []string, stdout io.W
 	}
 	remaining := flags.Args()
 	if len(remaining) != 4 {
-		return errors.New("usage: deptrust compare [--json] [--project-dir <absolute-dir> | --nuget-config <absolute-file> | --bundler-lock <absolute-lockfile>] <ecosystem> <package> <from-version> <to-version>")
+		return errors.New("usage: deptrust compare [--json] [--project-dir <absolute-dir> | --nuget-config <absolute-file> | --bundler-lock <absolute-lockfile> | --source-file <absolute-file>] <ecosystem> <package> <from-version> <to-version>")
 	}
 
 	query, err := app.ParseQuery(remaining[0], remaining[1], "")
@@ -292,6 +297,7 @@ func runCompare(ctx context.Context, service app.App, args []string, stdout io.W
 	query.ProjectDir = *projectDir
 	query.NuGetConfig = *nugetConfig
 	query.BundlerLock = *bundlerLock
+	query.SourceFile = *sourceFile
 	result, err := service.CompareVersions(ctx, query, remaining[2], remaining[3])
 	if err != nil {
 		return err
@@ -322,9 +328,9 @@ func printUsage(w io.Writer) {
 deptrust checks package versions for known vulnerabilities.
 
 Usage:
-  deptrust check [--json] [--project-dir <absolute-dir> | --nuget-config <absolute-file> | --bundler-lock <absolute-lockfile>] <ecosystem> <package> [version|latest]
-  deptrust suggest [--json] [--project-dir <absolute-dir> | --nuget-config <absolute-file> | --bundler-lock <absolute-lockfile>] <ecosystem> <package>
-  deptrust compare [--json] [--project-dir <absolute-dir> | --nuget-config <absolute-file> | --bundler-lock <absolute-lockfile>] <ecosystem> <package> <from-version> <to-version>
+  deptrust check [--json] [--project-dir <absolute-dir> | --nuget-config <absolute-file> | --bundler-lock <absolute-lockfile> | --source-file <absolute-file>] <ecosystem> <package> [version|latest]
+  deptrust suggest [--json] [--project-dir <absolute-dir> | --nuget-config <absolute-file> | --bundler-lock <absolute-lockfile> | --source-file <absolute-file>] <ecosystem> <package>
+  deptrust compare [--json] [--project-dir <absolute-dir> | --nuget-config <absolute-file> | --bundler-lock <absolute-lockfile> | --source-file <absolute-file>] <ecosystem> <package> <from-version> <to-version>
   deptrust mcp
   deptrust setup [--codex-mcp] [--claude-code-mcp]
   deptrust hook tool
