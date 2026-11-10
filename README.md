@@ -586,8 +586,9 @@ checks continue to use the public registries.
   Use a consolidated config containing package sources and mappings. Exact package
   IDs take precedence over prefixes, longer prefixes over shorter ones, and `*`
   is the default. Matching is case-insensitive. Disabled sources are excluded.
-  Removal directives, duplicate source sections, and clears after entries are
-  rejected before network access; leading clears are accepted.
+  Ordered `add`, `remove`, and `clear` operations are applied to source/disabled
+  collections; source mappings support collection clears. Duplicate sections and
+  unsupported mapping directives are rejected before network access.
 
 Only an exclusive selection of the supported public source (npmjs.org or the
 NuGet v3 public index) proceeds to public checks. Custom, mixed, or unmapped

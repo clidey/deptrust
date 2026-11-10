@@ -104,8 +104,6 @@ func TestNPMEffectiveRegistry(t *testing.T) {
 
 func TestNuGetUnsupportedDirectivesStopLookup(t *testing.T) {
 	for _, body := range []string{
-		`<packageSources><add key="public" value="https://api.nuget.org/v3/index.json"/><clear/></packageSources>`,
-		`<packageSources><remove key="internal"/></packageSources>`,
 		`<packageSources/><packageSources/>`,
 		`<packageSources>`,
 	} {
@@ -116,6 +114,32 @@ func TestNuGetUnsupportedDirectivesStopLookup(t *testing.T) {
 		q := models.Query{Ecosystem: models.EcosystemNuGet, Package: "Secret", NuGetConfig: file}
 		if _, err := (App{}).CheckPackage(context.Background(), q); err == nil {
 			t.Fatalf("expected config error for %s", body)
+		}
+	}
+}
+
+func TestNuGetOrderedCollectionOperations(t *testing.T) {
+	for _, tt := range []struct {
+		section, disabled string
+		blocked           bool
+	}{
+		{`<add key="private" value="https://private.invalid"/><clear/><add key="public" value="https://api.nuget.org/v3/index.json"/>`, "", false},
+		{`<add key="private" value="https://private.invalid"/><remove key="private"/><add key="public" value="https://api.nuget.org/v3/index.json"/>`, "", false},
+		{`<add key="public" value="https://api.nuget.org/v3/index.json"/>`, `<add key="public" value="true"/><clear/>`, false},
+		{`<add key="public" value="https://api.nuget.org/v3/index.json"/><clear/>`, "", true},
+	} {
+		file := filepath.Join(t.TempDir(), "nuget.config")
+		body := `<configuration><packageSources>` + tt.section + `</packageSources><disabledPackageSources>` + tt.disabled + `</disabledPackageSources></configuration>`
+		if err := os.WriteFile(file, []byte(body), 0600); err != nil {
+			t.Fatal(err)
+		}
+		q := models.Query{Ecosystem: models.EcosystemNuGet, Package: "Secret", NuGetConfig: file}
+		reason, err := sourceRestriction(context.Background(), q)
+		if err != nil || (reason != "") != tt.blocked {
+			t.Fatalf("%q %v", reason, err)
+		}
+		if tt.blocked {
+			assertUnavailableSource(t, q)
 		}
 	}
 }

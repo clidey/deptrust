@@ -1,11 +1,8 @@
 package app
 
 import (
-	"bytes"
 	"context"
-	"encoding/xml"
 	"fmt"
-	"io"
 	"net/url"
 	"os"
 	"os/exec"
@@ -136,23 +133,6 @@ func publicSource(raw, host, sourcePath string) bool {
 	return err == nil && u.Scheme == "https" && strings.EqualFold(u.Host, host) && u.User == nil && u.RawQuery == "" && u.Fragment == "" && strings.TrimRight(u.Path, "/") == strings.TrimRight(sourcePath, "/")
 }
 
-type nugetEntry struct {
-	Key   string `xml:"key,attr"`
-	Value string `xml:"value,attr"`
-}
-type nugetSourceMapping struct {
-	Key      string `xml:"key,attr"`
-	Packages []struct {
-		Pattern string `xml:"pattern,attr"`
-	} `xml:"package"`
-}
-type nugetConfiguration struct {
-	XMLName  xml.Name             `xml:"configuration"`
-	Sources  []nugetEntry         `xml:"packageSources>add"`
-	Disabled []nugetEntry         `xml:"disabledPackageSources>add"`
-	Mappings []nugetSourceMapping `xml:"packageSourceMapping>packageSource"`
-}
-
 func nugetRestriction(query models.Query) (string, error) {
 	if !filepath.IsAbs(query.NuGetConfig) {
 		return "", fmt.Errorf("nuget_config must be absolute")
@@ -161,26 +141,14 @@ func nugetRestriction(query models.Query) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("cannot read selected NuGet configuration")
 	}
-	if err := validateNuGetDirectives(data); err != nil {
+	sources, mappings, err := parseNuGetSources(data)
+	if err != nil {
 		return "", err
-	}
-	var config nugetConfiguration
-	if err := xml.Unmarshal(data, &config); err != nil {
-		return "", fmt.Errorf("invalid NuGet configuration")
-	}
-	sources := map[string]string{}
-	for _, entry := range config.Sources {
-		sources[entry.Key] = entry.Value
-	}
-	for _, entry := range config.Disabled {
-		if strings.EqualFold(entry.Value, "true") {
-			delete(sources, entry.Key)
-		}
 	}
 	selected := map[string]bool{}
 	best := -1
 	name := strings.ToLower(query.Package)
-	for _, mapping := range config.Mappings {
+	for _, mapping := range mappings {
 		if _, enabled := sources[mapping.Key]; !enabled {
 			continue
 		}
@@ -210,7 +178,7 @@ func nugetRestriction(query models.Query) (string, error) {
 			}
 		}
 	}
-	if len(config.Mappings) == 0 {
+	if len(mappings) == 0 {
 		for key := range sources {
 			selected[key] = true
 		}
@@ -225,49 +193,4 @@ func nugetRestriction(query models.Query) (string, error) {
 		}
 	}
 	return "", nil
-}
-
-// validateNuGetDirectives rejects configuration operations we do not interpret.
-func validateNuGetDirectives(data []byte) error {
-	decoder := xml.NewDecoder(bytes.NewReader(data))
-	section := ""
-	sections := map[string]bool{}
-	seenEntry := false
-	for {
-		token, err := decoder.Token()
-		if err == io.EOF {
-			return nil
-		}
-		if err != nil {
-			return fmt.Errorf("invalid NuGet configuration")
-		}
-		switch element := token.(type) {
-		case xml.StartElement:
-			switch element.Name.Local {
-			case "packageSources", "disabledPackageSources", "packageSourceMapping":
-				if sections[element.Name.Local] {
-					return fmt.Errorf("duplicate NuGet configuration section")
-				}
-				sections[element.Name.Local] = true
-				section = element.Name.Local
-				seenEntry = false
-			case "remove":
-				if section != "" {
-					return fmt.Errorf("NuGet remove directives are not supported; select a consolidated configuration")
-				}
-			case "clear":
-				if section != "" && seenEntry {
-					return fmt.Errorf("NuGet clear directives after entries are not supported; select a consolidated configuration")
-				}
-			case "add", "packageSource":
-				if section != "" {
-					seenEntry = true
-				}
-			}
-		case xml.EndElement:
-			if element.Name.Local == section {
-				section = ""
-			}
-		}
-	}
 }
