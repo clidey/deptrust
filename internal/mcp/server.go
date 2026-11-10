@@ -31,7 +31,7 @@ const serverInstructions = "Use this server to vet dependencies for known vulner
 	"Recommendations: 'block' = do not install that version; 'review' = ask the user or pick a safer version; " +
 	"'allow' = no blocking known vulnerability found; 'unknown' = provider failure, unavailable registry verification, or incomplete assessment, do NOT treat as safe. " +
 	"When reporting back, include the package, version, recommendation, and the highest-severity advisory IDs found. " +
-	"For npm, Cargo, and Poetry project checks pass absolute project_dir; these require npm, Cargo, or Python 3.11+ respectively. " +
+	"For npm, Cargo, and Poetry project checks pass absolute project_dir; npm and Cargo require their respective tools; Poetry TOML is parsed natively. " +
 	"Go reads saved GOPRIVATE through go env when no nonempty value is exported, requiring Go on PATH. " +
 	"Cargo public-source confirmation requires an existing lockfile and cached metadata; failures stop before public requests. " +
 	"For RubyGems pass absolute bundler_lock to inspect locked sources using Ruby/Bundler without evaluating Gemfile; lock freshness is not verified. " +
@@ -272,7 +272,7 @@ func tools() []map[string]any {
 				"type": "object",
 				"properties": map[string]any{
 					"bundler_lock": map[string]any{"type": "string", "description": "Absolute Gemfile.lock to inspect resolved RubyGems sources with Ruby/Bundler. Does not evaluate Gemfile or verify freshness. Custom, ambiguous, or missing sources return unknown without public requests."},
-					"project_dir":  map[string]any{"type": "string", "description": "Absolute npm, Cargo, or Poetry project directory. Reads npm config, offline Cargo metadata, or Poetry source constraints (Python 3.11+). Unsupported sources return unknown without public requests."},
+					"project_dir":  map[string]any{"type": "string", "description": "Absolute npm, Cargo, or Poetry project directory. Reads npm config, offline Cargo metadata, or Poetry source constraints. Unsupported sources return unknown without public requests."},
 					"nuget_config": map[string]any{"type": "string", "description": "Absolute nuget.config file, used alone without configuration inheritance. Applies official package source mappings before public requests."},
 					"ecosystem": map[string]any{
 						"type":        "string",
@@ -298,7 +298,7 @@ func tools() []map[string]any {
 				"type": "object",
 				"properties": map[string]any{
 					"bundler_lock": map[string]any{"type": "string", "description": "Absolute Gemfile.lock to inspect resolved RubyGems sources with Ruby/Bundler. Does not evaluate Gemfile or verify freshness. Custom, ambiguous, or missing sources return unknown without public requests."},
-					"project_dir":  map[string]any{"type": "string", "description": "Absolute npm, Cargo, or Poetry project directory. Reads npm config, offline Cargo metadata, or Poetry source constraints (Python 3.11+). Unsupported sources return unknown without public requests."},
+					"project_dir":  map[string]any{"type": "string", "description": "Absolute npm, Cargo, or Poetry project directory. Reads npm config, offline Cargo metadata, or Poetry source constraints. Unsupported sources return unknown without public requests."},
 					"nuget_config": map[string]any{"type": "string", "description": "Absolute nuget.config file, used alone without configuration inheritance. Applies official package source mappings before public requests."},
 					"ecosystem": map[string]any{
 						"type":        "string",
@@ -320,7 +320,7 @@ func tools() []map[string]any {
 				"type": "object",
 				"properties": map[string]any{
 					"bundler_lock": map[string]any{"type": "string", "description": "Absolute Gemfile.lock to inspect resolved RubyGems sources with Ruby/Bundler. Does not evaluate Gemfile or verify freshness. Custom, ambiguous, or missing sources return unknown without public requests."},
-					"project_dir":  map[string]any{"type": "string", "description": "Absolute npm, Cargo, or Poetry project directory. Reads npm config, offline Cargo metadata, or Poetry source constraints (Python 3.11+). Unsupported sources return unknown without public requests."},
+					"project_dir":  map[string]any{"type": "string", "description": "Absolute npm, Cargo, or Poetry project directory. Reads npm config, offline Cargo metadata, or Poetry source constraints. Unsupported sources return unknown without public requests."},
 					"nuget_config": map[string]any{"type": "string", "description": "Absolute nuget.config file, used alone without configuration inheritance. Applies official package source mappings before public requests."},
 					"ecosystem": map[string]any{
 						"type":        "string",

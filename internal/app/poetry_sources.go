@@ -2,89 +2,139 @@ package app
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"os/exec"
-	"time"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
 
 	"github.com/clidey/deptrust/internal/models"
+	"github.com/pelletier/go-toml/v2"
 )
 
-// Python's standard TOML parser handles Poetry tables without a second TOML parser
-// or execution of project code. Only a decision is returned, never source URLs.
-const poetrySourceScript = `
-import json, re, sys, tomllib
-from pathlib import Path
-normalize = lambda name: re.sub(r"[-_.]+", "-", name).lower()
-name = normalize(sys.argv[2])
-with (Path(sys.argv[1]) / "pyproject.toml").open("rb") as f:
-    root = tomllib.load(f)
-poetry = root.get("tool", {}).get("poetry", {})
-sources = {}
-for source in poetry.get("source", []):
-    key = source["name"].lower()
-    if key in sources:
-        raise ValueError("duplicate source")
-    priority = source.get("priority", "primary")
-    if priority not in ("primary", "supplemental", "explicit") or "default" in source or "secondary" in source:
-        raise ValueError("unsupported source priority")
-    if key == "pypi" and "url" in source:
-        raise ValueError("PyPI cannot have a URL override")
-    sources[key] = priority
-entries = []
-def collect(dependencies):
-    for key, value in dependencies.items():
-        if normalize(key) == name:
-            entries.extend(value if isinstance(value, list) else [value])
-collect(poetry.get("dependencies", {}))
-collect(poetry.get("dev-dependencies", {}))
-for group in poetry.get("group", {}).values():
-    collect(group.get("dependencies", {}))
-for requirement in root.get("project", {}).get("dependencies", []):
-    match = re.match(r"[A-Za-z0-9][A-Za-z0-9._-]*", requirement)
-    if match and normalize(match.group()) == name:
-        # Poetry's own entry enriches PEP 621 dependency metadata.
-        if "@" in requirement:
-            entries.append({"url": True})
-        elif not entries:
-            entries.append(requirement)
-restricted = not entries
-for entry in entries:
-    if isinstance(entry, dict):
-        if any(key in entry for key in ("git", "path", "url")):
-            restricted = True
-            continue
-        source = entry.get("source")
-        if source is not None:
-            source = source.lower()
-            if source != "pypi" and source not in sources:
-                raise ValueError("undefined source")
-            if source != "pypi":
-                restricted = True
-            continue
-    elif not isinstance(entry, str):
-        raise ValueError("unsupported dependency declaration")
-    # Unconstrained dependencies may use any primary or supplemental source.
-    if any(key != "pypi" and priority != "explicit" for key, priority in sources.items()):
-        restricted = True
-print(json.dumps({"restricted": restricted}))
-`
+var pythonNameSeparators = regexp.MustCompile(`[-_.]+`)
+var requirementName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*`)
 
-func poetryRestriction(ctx context.Context, query models.Query) (string, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, "python3", "-I", "-c", poetrySourceScript, query.ProjectDir, query.Package)
-	out, err := cmd.Output()
+func pythonName(name string) string {
+	return strings.ToLower(pythonNameSeparators.ReplaceAllString(name, "-"))
+}
+
+func readProjectTOML(dir, file string) (map[string]any, error) {
+	data, err := os.ReadFile(filepath.Join(dir, file))
 	if err != nil {
-		return "", fmt.Errorf("cannot read Poetry source configuration; valid pyproject.toml and Python 3.11+ are required")
+		return nil, fmt.Errorf("cannot read selected project TOML")
 	}
-	var result struct {
-		Restricted bool `json:"restricted"`
+	var root map[string]any
+	if err := toml.Unmarshal(data, &root); err != nil {
+		return nil, fmt.Errorf("invalid project TOML")
 	}
-	if err := json.Unmarshal(out, &result); err != nil {
-		return "", fmt.Errorf("invalid Poetry source decision")
+	return root, nil
+}
+func table(value any) map[string]any { result, _ := value.(map[string]any); return result }
+func array(value any) []any          { result, _ := value.([]any); return result }
+func text(value any) string          { result, _ := value.(string); return result }
+
+func poetryRestriction(_ context.Context, query models.Query) (string, error) {
+	root, err := readProjectTOML(query.ProjectDir, "pyproject.toml")
+	if err != nil {
+		return "", err
 	}
-	if result.Restricted {
+	poetry := table(table(root["tool"])["poetry"])
+	sources := map[string]string{}
+	for _, raw := range array(poetry["source"]) {
+		source := table(raw)
+		name := strings.ToLower(text(source["name"]))
+		priority := text(source["priority"])
+		if priority == "" {
+			priority = "primary"
+		}
+		if name == "" || (priority != "primary" && priority != "supplemental" && priority != "explicit") || source["default"] != nil || source["secondary"] != nil {
+			return "", fmt.Errorf("unsupported Poetry source declaration")
+		}
+		if _, exists := sources[name]; exists {
+			return "", fmt.Errorf("duplicate Poetry source")
+		}
+		if name == "pypi" && source["url"] != nil {
+			return "", fmt.Errorf("PyPI cannot have a source URL override")
+		}
+		sources[name] = priority
+	}
+	entries := []any{}
+	collect := func(deps map[string]any) {
+		for name, value := range deps {
+			if pythonName(name) == pythonName(query.Package) {
+				if list, ok := value.([]any); ok {
+					entries = append(entries, list...)
+				} else {
+					entries = append(entries, value)
+				}
+			}
+		}
+	}
+	collect(table(poetry["dependencies"]))
+	collect(table(poetry["dev-dependencies"]))
+	for _, group := range table(poetry["group"]) {
+		collect(table(table(group)["dependencies"]))
+	}
+	// Poetry tables enrich all matching PEP 621/group requirements; direct URLs
+	// still take precedence because their artifact is not a PyPI identity.
+	collectRequirements := func(list []any) {
+		for _, raw := range list {
+			requirement, ok := raw.(string)
+			if !ok {
+				continue
+			}
+			if pythonName(requirementName.FindString(requirement)) != pythonName(query.Package) {
+				continue
+			}
+			if strings.Contains(requirement, "@") {
+				entries = append(entries, map[string]any{"url": true})
+			} else if len(entries) == 0 {
+				entries = append(entries, requirement)
+			}
+		}
+	}
+	project := table(root["project"])
+	collectRequirements(array(project["dependencies"]))
+	for _, list := range table(project["optional-dependencies"]) {
+		collectRequirements(array(list))
+	}
+	// All groups are considered, so include-group expansion cannot hide a source.
+	for _, list := range table(root["dependency-groups"]) {
+		collectRequirements(array(list))
+	}
+	restricted := len(entries) == 0
+	for _, entry := range entries {
+		switch dep := entry.(type) {
+		case map[string]any:
+			if dep["git"] != nil || dep["path"] != nil || dep["url"] != nil {
+				restricted = true
+				continue
+			}
+			if value, exists := dep["source"]; exists {
+				source := strings.ToLower(text(value))
+				if source == "" {
+					return "", fmt.Errorf("invalid Poetry source constraint")
+				}
+				if source != "pypi" {
+					if _, exists := sources[source]; !exists {
+						return "", fmt.Errorf("undefined Poetry source")
+					}
+					restricted = true
+				}
+				continue
+			}
+		case string:
+		default:
+			return "", fmt.Errorf("unsupported Poetry dependency declaration")
+		}
+		for name, priority := range sources {
+			if name != "pypi" && priority != "explicit" {
+				restricted = true
+			}
+		}
+	}
+	if restricted {
 		return "Poetry project does not exclusively declare this package from PyPI; public registry and advisory requests were skipped. Assessment is unavailable.", nil
 	}
 	return "", nil

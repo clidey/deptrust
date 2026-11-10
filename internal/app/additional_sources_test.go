@@ -103,9 +103,6 @@ func TestCargoAlternateRegistryOffline(t *testing.T) {
 }
 
 func TestPoetrySourceConstraints(t *testing.T) {
-	if err := exec.Command("python3", "-I", "-c", "import tomllib").Run(); err != nil {
-		t.Skip("Python 3.11+ required")
-	}
 	for _, tt := range []struct {
 		name, config string
 		blocked      bool
@@ -117,6 +114,8 @@ func TestPoetrySourceConstraints(t *testing.T) {
 		{"group path", "[tool.poetry.group.dev.dependencies]\nsecret-package={path='../secret'}\n", true},
 		{"pep621 public", "[project]\ndependencies=['Secret.Package>=1']\n", false},
 		{"pep621 direct", "[project]\ndependencies=['Secret.Package @ https://corp.invalid/package.whl']\n", true},
+		{"optional dependency", "[project.optional-dependencies]\nextra=['Secret.Package>=1']\n", false},
+		{"dependency group", "[dependency-groups]\ndev=['Secret.Package>=1']\n", false},
 		{"not declared", "[project]\ndependencies=['other']\n", true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -164,9 +163,6 @@ func TestCargoLocalPatchIsNotPublic(t *testing.T) {
 }
 
 func TestPoetryInvalidConfigurationStopsLookup(t *testing.T) {
-	if err := exec.Command("python3", "-I", "-c", "import tomllib").Run(); err != nil {
-		t.Skip("Python 3.11+ required")
-	}
 	for _, data := range []string{
 		"not valid toml = [",
 		"[tool.poetry.dependencies]\nsecret={source='missing',version='1'}\n",

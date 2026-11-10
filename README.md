@@ -623,11 +623,10 @@ deptrust check --json --project-dir /absolute/path/to/python-project pypi intern
   current lockfile and cached metadata for the resolved graph; failures stop
   before public requests. This does not build code or fetch missing dependencies.
   It does not scan arbitrary transitive dependencies or authenticate to registries.
-- **Poetry:** requires Python 3.11+ on PATH as `python3`, using the standard
-  `tomllib` parser in isolated mode. Reads `pyproject.toml` without executing
+- **Poetry:** uses a native Go TOML parser; Python is not required. Reads `pyproject.toml` without executing
   project code or invoking installation. Supports explicit `source` constraints,
-  dependency groups, legacy dev-dependencies, and Poetry enrichment of PEP 621
-  dependencies. PyPI-bound dependencies can proceed; custom source constraints
+  dependency groups, optional dependencies, legacy dev-dependencies, and Poetry
+  enrichment of PEP 621 dependencies. PyPI-bound dependencies can proceed; custom source constraints
   and direct Git/path/URL dependencies return `unknown`. Unconstrained packages
   also return `unknown` if custom primary/supplemental sources could supply them.
   Unused explicit sources do not affect other dependencies. Source constraints
