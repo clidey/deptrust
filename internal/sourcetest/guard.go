@@ -3,6 +3,7 @@ package sourcetest
 
 import (
 	"fmt"
+	"github.com/clidey/deptrust/internal/models"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -40,4 +41,32 @@ func NuGetConfig(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return file
+}
+
+// ArtifactQueries supplies private/unsupported official artifacts for every native reader.
+func ArtifactQueries(t *testing.T) []models.Query {
+	t.Helper()
+	fixtures := []struct {
+		ecosystem       models.Ecosystem
+		name, pkg, body string
+	}{
+		{models.EcosystemPackagist, "composer.json", "company/secret", `{"repositories":[{"type":"composer","url":"https://credential-sentinel@private.invalid"}]}`},
+		{models.EcosystemPub, "pubspec.yaml", "secret", "dependencies:\n  secret: {hosted: https://private.invalid}\n"},
+		{models.EcosystemPyPI, "uv.lock", "secret", "[[package]]\nname='secret'\nsource={registry='https://private.invalid/simple'}\n"},
+		{models.EcosystemNPM, ".yarnrc.yml", "@company/secret", "npmRegistryServer: https://private.invalid\n"},
+		{models.EcosystemHackage, "plan.json", "secret", `{"install-plan":[{"pkg-name":"secret","pkg-src":{"type":"local","path":"../secret"}}]}`},
+		{models.EcosystemCocoaPods, "Podfile.lock", "Secret", "SPEC REPOS:\n  private:\n    - Secret\n"},
+		{models.EcosystemHex, "package.json", "secret", `{"name":"secret","repository":"hexpm:company","html_url":"https://hex.pm/packages/secret"}`},
+		{models.EcosystemGitHubActions, "repository.json", "company/secret", `{"full_name":"company/secret","private":true,"visibility":"private","html_url":"https://github.com/company/secret"}`},
+		{models.EcosystemMaven, "effective-settings.xml", "company:secret", `<settings><mirrors><mirror><url>https://private.invalid/maven</url></mirror></mirrors></settings>`},
+	}
+	queries := []models.Query{{Ecosystem: models.EcosystemNuGet, Package: "Company.Secret", NuGetConfig: NuGetConfig(t)}}
+	for _, fixture := range fixtures {
+		file := filepath.Join(t.TempDir(), fixture.name)
+		if err := os.WriteFile(file, []byte(fixture.body), 0600); err != nil {
+			t.Fatal(err)
+		}
+		queries = append(queries, models.Query{Ecosystem: fixture.ecosystem, Package: fixture.pkg, SourceFile: file})
+	}
+	return queries
 }
