@@ -529,3 +529,30 @@ which deptrust
 Then put that absolute path in the MCP config.
 
 If a package check returns `unknown`, do not treat the package as safe. It means deptrust could not get a complete answer from an advisory provider or could not verify the exact version with its registry.
+
+### Private Go modules
+
+Export `GOPRIVATE` in the environment of the CLI or MCP server to identify private
+Go module paths:
+
+```sh
+export GOPRIVATE='github.com/your-org/*,git.corp.example.com'
+deptrust check go github.com/your-org/internal-lib v1.2.3
+```
+
+DepTrust uses Go's comma-separated module-prefix glob semantics. Matching Go
+modules skip all public registry and advisory requests and return `unknown`,
+with registry verification `unverified` and advisory coverage `none`. Suggestions
+and comparisons also skip these requests and cannot recommend a version.
+This does not verify the module's existence, authenticate to its repository, or
+scan its dependencies. Other ecosystems and nonmatching Go modules retain their
+normal behavior.
+
+DepTrust reads the exported environment variable directly; settings saved only
+with `go env -w GOPRIVATE=...` are not read. For MCP, configure `GOPRIVATE` in the
+server's environment. `GONOPROXY` and `GONOSUMDB` do not override this privacy
+policy. Configure patterns before checking private names: unmarked paths use
+public services.
+
+See the [official Go private-module documentation](https://go.dev/ref/mod#private-modules)
+for the underlying Go configuration and pattern semantics.
