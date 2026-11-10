@@ -753,3 +753,24 @@ npmjs.org packages cannot be identified reliably from a scope name alone.
 
 References: [Yarn settings](https://yarnpkg.com/configuration/yarnrc/),
 [pnpm settings](https://pnpm.io/settings), [npm config](https://docs.npmjs.com/cli/v11/using-npm/config/).
+
+### Maven and Gradle boundaries
+
+Maven `source_file` accepts an exported `help:effective-pom` or
+`help:effective-settings` XML artifact as an explicit restriction context.
+Custom repositories/mirrors stop public assessment. A single effective artifact
+cannot establish the complete source set: Maven merges settings, POM inheritance,
+profiles, dependency POM repositories, and mirrors. These targeted Maven checks
+therefore remain `unknown`, including for an artifact listing only Central.
+DepTrust does not claim complete Maven source-resolution support or run Maven
+plugins to create these artifacts. Untargeted checks retain public behavior.
+
+Gradle content filters/exclusiveContent are documented official mechanisms, but
+Gradle lockfiles do not establish the effective repository routing. Executable
+Gradle build scripts are not parsed with regular expressions or evaluated here.
+Gradle routing support remains deferred pending a supported resolved-source
+export/integration; it is not inferred from Maven coordinates.
+
+References: [Maven repository order](https://maven.apache.org/guides/mini/guide-multiple-repositories),
+[effective artifacts](https://maven.apache.org/plugins/maven-help-plugin/usage.html),
+[Gradle exclusive content](https://docs.gradle.org/current/userguide/filtering_repository_content.html).
