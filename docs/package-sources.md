@@ -22,8 +22,8 @@ Do not use an incomplete snapshot to establish an effective private/public bound
 | Bundler | Selected lockfile GEM sources, safe separation from foreign sources | No Gemfile evaluation/freshness/local overrides; Git/path/plugin gems remain unknown |
 | Composer | Selected root repository declarations, only/exclude filters | No global/environment/plugin merge; cannot infer repository identity from lock download URLs |
 | Dart/pub | Selected pubspec/lock sources, dependency overrides; PUB_HOSTED_URL | No workspace/pubspec_overrides.yaml merge or freshness |
-| Maven | Selected effective XML is recognized and returns unknown | One artifact omits other effective sources; full routing not implemented |
-| Gradle | Official mechanisms researched; no routing implementation | Lockfiles omit routing; evaluating build configuration or inventing an export is outside this static-artifact implementation |
+| Maven | Offline effective-project lifecycle callback, parent/profile/settings processing and public mirror API | Trusted project/JDK/Maven required; direct declared dependencies only; system/reactor identities and mixed endpoints remain unknown; standalone XML still insufficient |
+| Gradle | Offline trusted-project inspection using public repository/resolution APIs and an inspection task | Cached metadata required; no undeclared/transitive queries, local substitutions or composite builds; mixed sources remain unknown even if filters might narrow them |
 | Hex | Selected API metadata or parser-only mix.lock AST; qualified repository names | Mix parsing requires Elixir; no effective runtime repository overrides or authenticated private fetching |
 | Cabal | Selected plan.json package/repository locations | No plan generation, config inheritance, or freshness verification |
 | CocoaPods | Selected Podfile.lock spec repos and external sources | No Podfile evaluation, installed repo overrides, or freshness verification |
@@ -68,3 +68,15 @@ Do not use an incomplete snapshot to establish an effective private/public bound
 - [Cabal plan writer](https://github.com/haskell/cabal/blob/master/cabal-install/src/Distribution/Client/ProjectPlanOutput.hs)
 - [CocoaPods lockfile](https://github.com/CocoaPods/Core/blob/master/lib/cocoapods-core/lockfile.rb)
 - [GitHub repository metadata](https://docs.github.com/en/rest/repos/repos)
+
+## Runtime integration verification
+
+NuGet inheritance is checked against SDK NuGet.Configuration merge decisions,
+not just matching Go fixtures. Mix uses Elixir AST parsing, tested in an official
+network-disabled container without evaluating executable lock content.
+Maven/Gradle runtime tests are opt-in (`DEPTRUST_TEST_JVM=1`) and use isolated
+projects with local repository request counters. Maven inspects before build
+goals; Gradle executes an inspection task and may run configuration-time code.
+These integrations are for trusted projects and are not filesystem/network
+sandboxes for arbitrary project code. Authenticated private endpoint fetching
+and advisory-provider integration remain separate from source classification.

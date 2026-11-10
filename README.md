@@ -755,26 +755,55 @@ npmjs.org packages cannot be identified reliably from a scope name alone.
 References: [Yarn settings](https://yarnpkg.com/configuration/yarnrc/),
 [pnpm settings](https://pnpm.io/settings), [npm config](https://docs.npmjs.com/cli/v11/using-npm/config/).
 
-### Maven and Gradle boundaries
+### Effective Maven and Gradle sources
 
-Maven `source_file` accepts an exported `help:effective-pom` or
-`help:effective-settings` XML artifact as an explicit restriction context.
-Custom repositories/mirrors stop public assessment. A single effective artifact
-cannot establish the complete source set: Maven merges settings, POM inheritance,
-profiles, dependency POM repositories, and mirrors. These targeted Maven checks
-therefore remain `unknown`, including for an artifact listing only Central.
-DepTrust does not claim complete Maven source-resolution support or run Maven
-plugins to create these artifacts. Untargeted checks retain public behavior.
+Use `--project-dir /absolute/path/to/project maven group:artifact 1.2.3` (MCP:
+`project_dir`, ecosystem `maven`). The installed Maven/Gradle tool processes its
+own effective configuration. A directory containing both POM and Gradle build
+files is rejected instead of guessing which manager applies.
 
-Gradle content filters/exclusiveContent are documented official mechanisms, but
-Gradle lockfiles do not establish the effective repository routing. Executable
-Gradle build scripts are not parsed with regular expressions or evaluated here.
-Gradle routing support remains deferred pending a supported resolved-source
-export/integration; it is not inferred from Maven coordinates.
+- **Maven:** requires Maven and a compatible JDK (`javac`/`jar`). A temporary
+  extension uses Maven's public `afterProjectsRead` lifecycle callback after model
+  inheritance, settings, and active profiles have been applied. Resolver's public
+  mirror selector supplies the effective endpoint. The inspector aborts before
+  build goals run. System-path and reactor-local identities remain `unknown`.
+- **Gradle:** requires installed Gradle. An init script uses public repository and
+  resolution APIs and runs a generated inspection task in the selected project's
+  task context. Metadata is resolved offline to detect local/project or module
+  substitutions. Requested/default project tasks are not scheduled by DepTrust.
+  Missing cached metadata, unresolved identities, and composite builds remain
+  `unknown`.
 
-References: [Maven repository order](https://maven.apache.org/guides/mini/guide-multiple-repositories),
-[effective artifacts](https://maven.apache.org/plugins/maven-help-plugin/usage.html),
-[Gradle exclusive content](https://docs.gradle.org/current/userguide/filtering_repository_content.html).
+These are **trusted-project integrations**, not static parsers or sandboxes.
+Maven model extensions and Gradle configuration/buildSrc/plugin code may execute;
+build tools may write local caches. Both are invoked offline, using installed
+executables rather than wrappers that might download a distribution. Prepare
+required parent POMs, extensions, plugins, and metadata in advance. Select the
+actual project/subproject directory whose declared direct dependency is being
+checked. Arbitrary transitive queries and undeclared modules remain `unknown`.
+
+Only exclusively Maven Central endpoints permit a public assessment. Custom,
+mixed, Ivy/local, or uncertain source sets return `unknown`, including mixed
+Gradle repositories where a content filter might exclude the private source for
+this particular module. The implementation does not use internal filter APIs or
+pretend it can prove that narrower routing.
+
+A standalone Maven effective XML supplied via `source_file` still returns
+`unknown`: one artifact alone cannot establish the full effective source set.
+No private registry credentials are fetched or changed.
+
+Runtime tests use isolated projects and local repository tripwires, including
+settings profiles, parent inheritance, mirrors, system/reactor dependencies,
+Gradle exclusive content, project substitution, and missing offline metadata.
+Run with `DEPTRUST_TEST_JVM=1 go test ./internal/app -run 'TestEffectiveMaven|TestEffectiveGradle|TestMavenLocal'`.
+The public Gradle fixture primes an isolated cache with the vetted public
+commons-lang3 test module before testing the product's offline inspection.
+
+References: [Maven lifecycle callback](https://maven.apache.org/ref/3.9.11/maven-core/apidocs/org/apache/maven/AbstractMavenLifecycleParticipant.html),
+[Maven repository order](https://maven.apache.org/guides/mini/guide-multiple-repositories),
+[Gradle public repository API](https://docs.gradle.org/current/javadoc/org/gradle/api/artifacts/repositories/MavenArtifactRepository.html),
+[Gradle resolution results](https://docs.gradle.org/current/javadoc/org/gradle/api/artifacts/result/ResolutionResult.html),
+[Gradle safe resolution lifecycle](https://docs.gradle.org/current/userguide/declaring_configurations.html).
 
 ### Cabal resolved plans
 
@@ -833,7 +862,8 @@ Hooks also accept optional `source_context` containing the same `project_dir`,
 `nuget_config`, `bundler_lock`, or `source_file` selector used by CLI/MCP. The
 wrapper supplying hook JSON must provide it explicitly; identity/version fields
 cannot override parsed install requests. With an absolute `cwd`, hooks use npm or
-Cargo project context; Go uses effective GOPRIVATE independently. Other project
+Cargo project context; NuGet uses its effective .NET hierarchy, and Go uses
+effective GOPRIVATE independently. Other project
 installs require explicit context rather than guessing inherited repositories
 from a nearby artifact. New dependencies not yet represented by selected
 artifacts may return `unknown`. This does not turn command parsing into a complete shell

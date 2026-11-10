@@ -32,7 +32,7 @@ const serverInstructions = "Use this server to vet dependencies for known vulner
 	"Recommendations: 'block' = do not install that version; 'review' = ask the user or pick a safer version; " +
 	"'allow' = no blocking known vulnerability found; 'unknown' = provider failure, unavailable registry verification, or incomplete assessment, do NOT treat as safe. " +
 	"When reporting back, include the package, version, recommendation, and the highest-severity advisory IDs found. " +
-	"For npm, Cargo, Poetry, and NuGet project checks pass absolute project_dir. npm/Cargo/.NET tools are required for their respective managers; Poetry TOML is native. NuGet project_dir applies the inherited configuration reported by dotnet nuget config paths. " +
+	"For npm, Cargo, Poetry, NuGet, Maven, and Gradle project checks pass absolute project_dir. npm/Cargo/.NET/JDK/Maven/Gradle tools are required for their respective managers; Poetry TOML is native. NuGet project_dir applies the inherited configuration reported by dotnet nuget config paths. JVM project_dir evaluates trusted project/build-extension code offline; it is not a sandbox. Maven aborts before build goals; Gradle runs a generated inspection task and may execute configuration-time code. " +
 	"Go reads saved GOPRIVATE through go env when no nonempty value is exported, requiring Go on PATH. " +
 	"Cargo public-source confirmation requires an existing lockfile and cached metadata; failures stop before public requests. " +
 	"For other source-aware checks pass source_file using the official artifact formats listed in the schema. Selected artifacts do not establish complete effective configuration or freshness. " +
@@ -281,7 +281,7 @@ func tools() []map[string]any {
 				"properties": map[string]any{
 					"source_file":  map[string]any{"type": "string", "description": sourceFileDescription},
 					"bundler_lock": map[string]any{"type": "string", "description": "Absolute Gemfile.lock to inspect resolved RubyGems sources with Ruby/Bundler. Does not evaluate Gemfile or verify freshness. Custom, ambiguous, or missing sources return unknown without public requests."},
-					"project_dir":  map[string]any{"type": "string", "description": "Absolute npm, Cargo, Poetry, or NuGet project directory. Reads npm config, offline Cargo metadata, Poetry source constraints, or inherited NuGet configs discovered by the .NET CLI. Unsupported sources return unknown without public requests."},
+					"project_dir":  map[string]any{"type": "string", "description": "Absolute package-manager project directory. Supports npm, Cargo, Poetry, NuGet, Maven and Gradle (last two use ecosystem maven). JVM inspection evaluates trusted build configuration offline and may write build-tool caches; Gradle runs an inspection task. Custom/mixed sources, local substitutions and missing cached metadata remain unknown. Unsupported sources return unknown without public requests."},
 					"nuget_config": map[string]any{"type": "string", "description": "Absolute nuget.config file, used alone without configuration inheritance. Applies official package source mappings before public requests."},
 					"ecosystem": map[string]any{
 						"type":        "string",
@@ -308,7 +308,7 @@ func tools() []map[string]any {
 				"properties": map[string]any{
 					"source_file":  map[string]any{"type": "string", "description": sourceFileDescription},
 					"bundler_lock": map[string]any{"type": "string", "description": "Absolute Gemfile.lock to inspect resolved RubyGems sources with Ruby/Bundler. Does not evaluate Gemfile or verify freshness. Custom, ambiguous, or missing sources return unknown without public requests."},
-					"project_dir":  map[string]any{"type": "string", "description": "Absolute npm, Cargo, Poetry, or NuGet project directory. Reads npm config, offline Cargo metadata, Poetry source constraints, or inherited NuGet configs discovered by the .NET CLI. Unsupported sources return unknown without public requests."},
+					"project_dir":  map[string]any{"type": "string", "description": "Absolute package-manager project directory. Supports npm, Cargo, Poetry, NuGet, Maven and Gradle (last two use ecosystem maven). JVM inspection evaluates trusted build configuration offline and may write build-tool caches; Gradle runs an inspection task. Custom/mixed sources, local substitutions and missing cached metadata remain unknown. Unsupported sources return unknown without public requests."},
 					"nuget_config": map[string]any{"type": "string", "description": "Absolute nuget.config file, used alone without configuration inheritance. Applies official package source mappings before public requests."},
 					"ecosystem": map[string]any{
 						"type":        "string",
@@ -331,7 +331,7 @@ func tools() []map[string]any {
 				"properties": map[string]any{
 					"source_file":  map[string]any{"type": "string", "description": sourceFileDescription},
 					"bundler_lock": map[string]any{"type": "string", "description": "Absolute Gemfile.lock to inspect resolved RubyGems sources with Ruby/Bundler. Does not evaluate Gemfile or verify freshness. Custom, ambiguous, or missing sources return unknown without public requests."},
-					"project_dir":  map[string]any{"type": "string", "description": "Absolute npm, Cargo, Poetry, or NuGet project directory. Reads npm config, offline Cargo metadata, Poetry source constraints, or inherited NuGet configs discovered by the .NET CLI. Unsupported sources return unknown without public requests."},
+					"project_dir":  map[string]any{"type": "string", "description": "Absolute package-manager project directory. Supports npm, Cargo, Poetry, NuGet, Maven and Gradle (last two use ecosystem maven). JVM inspection evaluates trusted build configuration offline and may write build-tool caches; Gradle runs an inspection task. Custom/mixed sources, local substitutions and missing cached metadata remain unknown. Unsupported sources return unknown without public requests."},
 					"nuget_config": map[string]any{"type": "string", "description": "Absolute nuget.config file, used alone without configuration inheritance. Applies official package source mappings before public requests."},
 					"ecosystem": map[string]any{
 						"type":        "string",

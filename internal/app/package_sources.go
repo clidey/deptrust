@@ -69,6 +69,8 @@ func sourceRestriction(ctx context.Context, query models.Query) (string, error) 
 			return "", fmt.Errorf("project_dir must be absolute")
 		}
 		switch query.Ecosystem {
+		case models.EcosystemMaven:
+			return jvmProjectRestriction(ctx, query)
 		case models.EcosystemNuGet:
 			return nugetProjectRestriction(ctx, query)
 		case models.EcosystemNPM:
@@ -84,7 +86,7 @@ func sourceRestriction(ctx context.Context, query models.Query) (string, error) 
 		case models.EcosystemPyPI:
 			return poetryRestriction(ctx, query)
 		default:
-			return "", fmt.Errorf("project_dir is supported for npm, Cargo, Poetry, and NuGet")
+			return "", fmt.Errorf("project_dir is supported for npm, Cargo, Poetry, NuGet, Maven, and Gradle")
 		}
 	}
 	if query.NuGetConfig != "" {
