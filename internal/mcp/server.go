@@ -15,6 +15,7 @@ import (
 
 const protocolVersion = "2025-11-25"
 const ecosystemDescription = "Package ecosystem: npm, pypi, cargo, go, rubygems, nuget, maven, packagist, pub, cocoapods, hex, hackage, or github-actions."
+const sourceFileDescription = "Absolute official source artifact. npm: .npmrc, .yarnrc, .yarnrc.yml, pnpm-workspace.yaml/config.yaml; pypi: pyproject.toml, uv.lock, Pipfile, Pipfile.lock, pip.conf/pip.ini; packagist: composer.json; pub: pubspec.yaml/pubspec.lock; hackage: Cabal plan.json; cocoapods: Podfile.lock; hex: package API JSON; github-actions: repository API JSON; maven: effective POM/settings XML (unknown because context is incomplete). Reads only the selected artifact; does not merge inheritance, verify freshness/provenance, or authenticate. Mutually exclusive with other source selectors."
 
 const serverInstructions = "Use this server to vet dependencies for known vulnerabilities BEFORE making any statements about safety or recommendability. " +
 	"Trigger it whenever you list, compare, suggest specific versions, or answer questions like 'what can I update', 'which deps should I upgrade', or 'are these versions okay'. " +
@@ -34,6 +35,7 @@ const serverInstructions = "Use this server to vet dependencies for known vulner
 	"For npm, Cargo, and Poetry project checks pass absolute project_dir; npm and Cargo require their respective tools; Poetry TOML is parsed natively. " +
 	"Go reads saved GOPRIVATE through go env when no nonempty value is exported, requiring Go on PATH. " +
 	"Cargo public-source confirmation requires an existing lockfile and cached metadata; failures stop before public requests. " +
+	"For other source-aware checks pass source_file using the official artifact formats listed in the schema. Selected artifacts do not establish complete effective configuration or freshness. " +
 	"For RubyGems pass absolute bundler_lock to inspect locked sources using Ruby/Bundler without evaluating Gemfile; lock freshness is not verified. " +
 	"For NuGet pass absolute nuget_config; that file is used alone, without inherited settings. " +
 	"Custom or ambiguous sources return unknown without public requests. Always retain these arguments in follow-up calls. " +
@@ -277,7 +279,7 @@ func tools() []map[string]any {
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"source_file":  map[string]any{"type": "string", "description": "Absolute official source configuration/lock artifact. Supported formats are ecosystem-specific; see README. Reads only this artifact, without executing project code or verifying freshness."},
+					"source_file":  map[string]any{"type": "string", "description": sourceFileDescription},
 					"bundler_lock": map[string]any{"type": "string", "description": "Absolute Gemfile.lock to inspect resolved RubyGems sources with Ruby/Bundler. Does not evaluate Gemfile or verify freshness. Custom, ambiguous, or missing sources return unknown without public requests."},
 					"project_dir":  map[string]any{"type": "string", "description": "Absolute npm, Cargo, or Poetry project directory. Reads npm config, offline Cargo metadata, or Poetry source constraints. Unsupported sources return unknown without public requests."},
 					"nuget_config": map[string]any{"type": "string", "description": "Absolute nuget.config file, used alone without configuration inheritance. Applies official package source mappings before public requests."},
@@ -304,7 +306,7 @@ func tools() []map[string]any {
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"source_file":  map[string]any{"type": "string", "description": "Absolute official source configuration/lock artifact. Supported formats are ecosystem-specific; see README. Reads only this artifact, without executing project code or verifying freshness."},
+					"source_file":  map[string]any{"type": "string", "description": sourceFileDescription},
 					"bundler_lock": map[string]any{"type": "string", "description": "Absolute Gemfile.lock to inspect resolved RubyGems sources with Ruby/Bundler. Does not evaluate Gemfile or verify freshness. Custom, ambiguous, or missing sources return unknown without public requests."},
 					"project_dir":  map[string]any{"type": "string", "description": "Absolute npm, Cargo, or Poetry project directory. Reads npm config, offline Cargo metadata, or Poetry source constraints. Unsupported sources return unknown without public requests."},
 					"nuget_config": map[string]any{"type": "string", "description": "Absolute nuget.config file, used alone without configuration inheritance. Applies official package source mappings before public requests."},
@@ -327,7 +329,7 @@ func tools() []map[string]any {
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"source_file":  map[string]any{"type": "string", "description": "Absolute official source configuration/lock artifact. Supported formats are ecosystem-specific; see README. Reads only this artifact, without executing project code or verifying freshness."},
+					"source_file":  map[string]any{"type": "string", "description": sourceFileDescription},
 					"bundler_lock": map[string]any{"type": "string", "description": "Absolute Gemfile.lock to inspect resolved RubyGems sources with Ruby/Bundler. Does not evaluate Gemfile or verify freshness. Custom, ambiguous, or missing sources return unknown without public requests."},
 					"project_dir":  map[string]any{"type": "string", "description": "Absolute npm, Cargo, or Poetry project directory. Reads npm config, offline Cargo metadata, or Poetry source constraints. Unsupported sources return unknown without public requests."},
 					"nuget_config": map[string]any{"type": "string", "description": "Absolute nuget.config file, used alone without configuration inheritance. Applies official package source mappings before public requests."},

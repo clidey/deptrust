@@ -643,7 +643,7 @@ public requests. Calls without project targeting retain public-registry behavior
 Official references: [Go environment configuration](https://pkg.go.dev/cmd/go#hdr-Environment_variables),
 [Cargo metadata](https://doc.rust-lang.org/cargo/commands/cargo-metadata.html),
 [Poetry package source constraints](https://python-poetry.org/docs/repositories/#package-source-constraint),
-[Python TOML parser](https://docs.python.org/3/library/tomllib.html).
+[Go TOML parser](https://github.com/pelletier/go-toml).
 
 ### Bundler locked gem sources
 
@@ -742,7 +742,7 @@ For npm ecosystem checks, `--source-file` accepts Yarn Classic `.yarnrc`, Yarn
 Berry `.yarnrc.yml`, and pnpm `pnpm-workspace.yaml`/`config.yaml`. Registry and
 scope mappings in the selected file determine whether public assessment applies.
 Unknown/custom registry identities return `unknown`. Named pnpm registry routing
-is unsupported and returns `unknown`. Registry URL interpolation is not guessed.
+and URL-keyed registry declaration objects are unsupported and return `unknown`. Registry URL interpolation is not guessed.
 This is a selected-file assessment, not a merge of all inherited package-manager
 configuration, plugins, package overrides, aliases, or command-line options.
 
@@ -783,8 +783,8 @@ Only matching `repo-tar` packages whose recorded repository URI is HTTPS
 hackage.haskell.org proceed to public checks. Local, source-repository, tarball,
 custom-repository, missing-source, and unlisted packages return `unknown`.
 The parser follows Cabal's official plan writer; fixtures cover those shapes.
-Cabal is not installed in the local verification environment, so fresh plan
-generation was not tested. The selected plan is not freshness/provenance proof.
+The selected plan is not freshness/provenance proof; DepTrust does not generate
+or update it.
 
 References: [Cabal external plan artifact](https://cabal.readthedocs.io/en/stable/nix-local-build.html),
 [official plan writer](https://github.com/haskell/cabal/blob/master/cabal-install/src/Distribution/Client/ProjectPlanOutput.hs).
@@ -838,3 +838,6 @@ installs require explicit context rather than guessing inherited repositories
 from a nearby artifact. New dependencies not yet represented by selected
 artifacts may return `unknown`. This does not turn command parsing into a complete shell
 interpreter; unrecognized commands and source overrides remain documented limits.
+
+A consolidated [source support matrix](docs/package-sources.md) lists the
+implemented paths, verification boundaries, and deferred integrations.
