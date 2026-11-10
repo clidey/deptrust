@@ -39,7 +39,7 @@ func TestHookPreservesNPMSourceContext(t *testing.T) {
 
 func TestHookSourceOverridesStopBeforeLookup(t *testing.T) {
 	sourcetest.Guard(t)
-	for _, command := range []string{"npm install --registry=https://private.invalid secret@1.0.0", "pip install --index-url https://private.invalid secret==1.0.0", "mvn -Pprivate dependency:get -Dartifact=company:secret:1.0.0", "mvn -Dprivate=true dependency:get -Dartifact=company:secret:1.0.0"} {
+	for _, command := range []string{"npm install --registry=https://private.invalid secret@1.0.0", "pip install --index-url https://private.invalid secret==1.0.0", "mvn -Pprivate dependency:get -Dartifact=company:secret:1.0.0", "mvn -Dprivate=true dependency:get -Dartifact=company:secret:1.0.0", `mvn "-Pprivate" dependency:get -Dartifact=company:secret:1.0.0`, `npm install "--registry=https://private.invalid" secret@1.0.0`, `npm install --reg"is"try=https://private.invalid secret@1.0.0`} {
 		encoded, err := json.Marshal(map[string]any{"tool_input": map[string]string{"command": command}})
 		if err != nil {
 			t.Fatal(err)

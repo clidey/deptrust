@@ -47,6 +47,8 @@ func RunShell(ctx context.Context, service app.App, in io.Reader, out io.Writer)
 	if len(requests) > 0 {
 		fields := strings.Fields(toolInputString(input.ToolInput, "command"))
 		for _, field := range fields {
+			// Shell quoting must not hide a literal source-override flag.
+			field = strings.NewReplacer(`"`, "", `'`, "").Replace(field)
 			flag, _, _ := strings.Cut(field, "=")
 			if strings.HasPrefix(field, "-P") || (strings.HasPrefix(field, "-D") && !strings.HasPrefix(field, "-Dartifact=")) || (strings.HasPrefix(field, "-s") && !strings.HasPrefix(field, "--")) || strings.HasPrefix(field, "-gs") {
 				return deny(out, "deptrust cannot infer project profiles/properties/settings from install flags; run a check with the same explicit source context")
