@@ -678,3 +678,8 @@ are disabled for the parser subprocess.
 
 Official references: [Bundler per-gem sources and source blocks](https://guides.rubygems.org/gemfile/),
 [resolved lockfile sources](https://guides.rubygems.org/gemfile-lock/).
+
+Hook source checks use an absolute hook `cwd` for npm configuration. Install
+commands with explicit registry/index/configuration/directory overrides stop
+before public requests because the hook cannot reliably reconstruct those
+sources. Use the explicit source-aware CLI/MCP interface for those assessments.

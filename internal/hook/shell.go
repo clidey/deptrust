@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -14,6 +15,7 @@ import (
 )
 
 type hookInput struct {
+	Cwd       string                     `json:"cwd"`
 	ToolName  string                     `json:"tool_name"`
 	ToolInput map[string]json.RawMessage `json:"tool_input"`
 }
@@ -41,10 +43,28 @@ func RunShell(ctx context.Context, service app.App, in io.Reader, out io.Writer)
 	}
 
 	requests := ParseHookInput(input)
+	if len(requests) > 0 {
+		fields := strings.Fields(toolInputString(input.ToolInput, "command"))
+		for _, field := range fields {
+			flag, _, _ := strings.Cut(field, "=")
+			switch flag {
+			case "--registry", "--index-url", "--extra-index-url", "--source", "--repository", "--configfile", "--directory", "--prefix", "--cwd", "-C", "-i", "--find-links", "--no-index", "--config", "--userconfig", "--globalconfig", "--settings", "-s", "--project", "--manifest-path":
+				return deny(out, "deptrust cannot establish source context for this install override; run an explicit source-aware check before installing")
+			}
+		}
+	}
+
 	for _, request := range requests {
 		query, err := app.ParseQuery(request.Ecosystem, request.Name, request.Version)
 		if err != nil {
 			continue
+		}
+
+		if query.Ecosystem == models.EcosystemNPM && input.Cwd != "" {
+			if !filepath.IsAbs(input.Cwd) {
+				return deny(out, "deptrust requires an absolute hook cwd to check package sources")
+			}
+			query.ProjectDir = input.Cwd
 		}
 		result, err := service.CheckPackage(ctx, query)
 		if err != nil {
