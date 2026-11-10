@@ -15,6 +15,8 @@ const unsupportedArtifactSource = "Selected source artifact does not exclusively
 
 func artifactRestriction(ctx context.Context, query models.Query) (string, error) {
 	switch query.Ecosystem {
+	case models.EcosystemGitHubActions:
+		return actionArtifactRestriction(query)
 	case models.EcosystemHex:
 		return hexArtifactRestriction(query)
 	case models.EcosystemCocoaPods:

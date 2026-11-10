@@ -813,3 +813,17 @@ and effective Mix organization/repository routing remain unsupported.
 References: [Hex private organizations](https://hex.pm/docs/private),
 [Hex repository usage](https://hex.pm/docs/usage),
 [official repository-qualified naming](https://github.com/hexpm/hex/blob/main/lib/hex/utils.ex).
+
+### GitHub Actions visibility
+
+For GitHub Actions, local paths and `docker://` actions return `unknown` before
+public requests. For repository actions, `source_file` accepts the official
+GitHub repository API response JSON. Matching `full_name`, `private: false`,
+`visibility: public`, and github.com repository URL are required before public
+checks. Private/internal, mismatched, or incomplete metadata returns `unknown`.
+This snapshot is not live visibility verification and may become stale. Without
+it, ordinary owner/repo checks retain public behavior; privacy cannot be inferred
+from an owner/name. Fetching authenticated metadata and enterprise-host support
+remain separate integrations. No repository visibility or permission is changed.
+
+Reference: [GitHub repository REST metadata](https://docs.github.com/en/rest/repos/repos).
