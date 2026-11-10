@@ -19,10 +19,16 @@ import (
 // sourceRestriction checks only explicitly selected package-manager configuration.
 // Configuration failures stop assessment before any public request.
 func sourceRestriction(ctx context.Context, query models.Query) (string, error) {
-	if query.ProjectDir != "" && query.NuGetConfig != "" {
-		return "", fmt.Errorf("select project_dir or nuget_config, not both")
+	if (query.ProjectDir != "" && query.NuGetConfig != "") || (query.BundlerLock != "" && (query.ProjectDir != "" || query.NuGetConfig != "")) {
+		return "", fmt.Errorf("select only one of project_dir, nuget_config, or bundler_lock")
 	}
 
+	if query.BundlerLock != "" {
+		if query.Ecosystem != models.EcosystemRuby {
+			return "", fmt.Errorf("bundler_lock is supported only for RubyGems")
+		}
+		return bundlerRestriction(ctx, query)
+	}
 	if query.Ecosystem == models.EcosystemGo {
 		patterns, err := goPrivatePatterns(ctx)
 		if err != nil {

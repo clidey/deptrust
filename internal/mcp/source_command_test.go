@@ -11,6 +11,7 @@ func TestSourceCommandPreservesConfiguration(t *testing.T) {
 	for _, q := range []models.Query{
 		{ProjectDir: "/tmp/project with ' quotes"},
 		{NuGetConfig: "/tmp/project/nuget.config"},
+		{BundlerLock: "/tmp/project with spaces/Gemfile.lock"},
 	} {
 		original := command("check", "npm", "@corp/secret", "1.2.3")
 		got := sourceCommand(original, q)
@@ -18,6 +19,9 @@ func TestSourceCommandPreservesConfiguration(t *testing.T) {
 			t.Fatal(got)
 		}
 		if q.ProjectDir != "" && !strings.Contains(got, "--project-dir "+shellQuote(q.ProjectDir)) {
+			t.Fatal(got)
+		}
+		if q.BundlerLock != "" && !strings.Contains(got, "--bundler-lock "+shellQuote(q.BundlerLock)) {
 			t.Fatal(got)
 		}
 		if q.NuGetConfig != "" && !strings.Contains(got, "--nuget-config "+shellQuote(q.NuGetConfig)) {

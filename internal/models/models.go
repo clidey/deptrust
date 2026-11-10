@@ -126,6 +126,7 @@ func (e Ecosystem) GitHubEcosystem() string {
 }
 
 type Query struct {
+	BundlerLock string    `json:"bundler_lock,omitempty"`
 	ProjectDir  string    `json:"project_dir,omitempty"`
 	NuGetConfig string    `json:"nuget_config,omitempty"`
 	Ecosystem   Ecosystem `json:"ecosystem"`

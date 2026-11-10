@@ -34,6 +34,7 @@ const serverInstructions = "Use this server to vet dependencies for known vulner
 	"For npm, Cargo, and Poetry project checks pass absolute project_dir; these require npm, Cargo, or Python 3.11+ respectively. " +
 	"Go reads saved GOPRIVATE through go env when no nonempty value is exported, requiring Go on PATH. " +
 	"Cargo public-source confirmation requires an existing lockfile and cached metadata; failures stop before public requests. " +
+	"For RubyGems pass absolute bundler_lock to inspect locked sources using Ruby/Bundler without evaluating Gemfile; lock freshness is not verified. " +
 	"For NuGet pass absolute nuget_config; that file is used alone, without inherited settings. " +
 	"Custom or ambiguous sources return unknown without public requests. Always retain these arguments in follow-up calls. " +
 	"Boundaries: this checks known public advisories and registry metadata; it does not prove a package is safe, " +
@@ -71,6 +72,7 @@ type toolCallParams struct {
 }
 
 type checkArgs struct {
+	BundlerLock string `json:"bundler_lock,omitempty"`
 	ProjectDir  string `json:"project_dir,omitempty"`
 	NuGetConfig string `json:"nuget_config,omitempty"`
 	Ecosystem   string `json:"ecosystem"`
@@ -79,6 +81,7 @@ type checkArgs struct {
 }
 
 type suggestArgs struct {
+	BundlerLock string `json:"bundler_lock,omitempty"`
 	ProjectDir  string `json:"project_dir,omitempty"`
 	NuGetConfig string `json:"nuget_config,omitempty"`
 	Ecosystem   string `json:"ecosystem"`
@@ -86,6 +89,7 @@ type suggestArgs struct {
 }
 
 type compareArgs struct {
+	BundlerLock string `json:"bundler_lock,omitempty"`
 	ProjectDir  string `json:"project_dir,omitempty"`
 	NuGetConfig string `json:"nuget_config,omitempty"`
 	Ecosystem   string `json:"ecosystem"`
@@ -171,6 +175,7 @@ func callTool(ctx context.Context, service app.App, req request) response {
 		}
 		query.ProjectDir = args.ProjectDir
 		query.NuGetConfig = args.NuGetConfig
+		query.BundlerLock = args.BundlerLock
 		result, err := service.CheckPackage(ctx, query)
 		if err != nil {
 			return toolError(req.ID, err.Error())
@@ -189,6 +194,7 @@ func callTool(ctx context.Context, service app.App, req request) response {
 		}
 		query.ProjectDir = args.ProjectDir
 		query.NuGetConfig = args.NuGetConfig
+		query.BundlerLock = args.BundlerLock
 		result, err := service.SuggestSafeVersion(ctx, query)
 		if err != nil {
 			return toolError(req.ID, err.Error())
@@ -207,6 +213,7 @@ func callTool(ctx context.Context, service app.App, req request) response {
 		}
 		query.ProjectDir = args.ProjectDir
 		query.NuGetConfig = args.NuGetConfig
+		query.BundlerLock = args.BundlerLock
 		result, err := service.CompareVersions(ctx, query, args.FromVersion, args.ToVersion)
 		if err != nil {
 			return toolError(req.ID, err.Error())
@@ -264,6 +271,7 @@ func tools() []map[string]any {
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
+					"bundler_lock": map[string]any{"type": "string", "description": "Absolute Gemfile.lock to inspect resolved RubyGems sources with Ruby/Bundler. Does not evaluate Gemfile or verify freshness. Custom, ambiguous, or missing sources return unknown without public requests."},
 					"project_dir":  map[string]any{"type": "string", "description": "Absolute npm, Cargo, or Poetry project directory. Reads npm config, offline Cargo metadata, or Poetry source constraints (Python 3.11+). Unsupported sources return unknown without public requests."},
 					"nuget_config": map[string]any{"type": "string", "description": "Absolute nuget.config file, used alone without configuration inheritance. Applies official package source mappings before public requests."},
 					"ecosystem": map[string]any{
@@ -289,6 +297,7 @@ func tools() []map[string]any {
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
+					"bundler_lock": map[string]any{"type": "string", "description": "Absolute Gemfile.lock to inspect resolved RubyGems sources with Ruby/Bundler. Does not evaluate Gemfile or verify freshness. Custom, ambiguous, or missing sources return unknown without public requests."},
 					"project_dir":  map[string]any{"type": "string", "description": "Absolute npm, Cargo, or Poetry project directory. Reads npm config, offline Cargo metadata, or Poetry source constraints (Python 3.11+). Unsupported sources return unknown without public requests."},
 					"nuget_config": map[string]any{"type": "string", "description": "Absolute nuget.config file, used alone without configuration inheritance. Applies official package source mappings before public requests."},
 					"ecosystem": map[string]any{
@@ -310,6 +319,7 @@ func tools() []map[string]any {
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
+					"bundler_lock": map[string]any{"type": "string", "description": "Absolute Gemfile.lock to inspect resolved RubyGems sources with Ruby/Bundler. Does not evaluate Gemfile or verify freshness. Custom, ambiguous, or missing sources return unknown without public requests."},
 					"project_dir":  map[string]any{"type": "string", "description": "Absolute npm, Cargo, or Poetry project directory. Reads npm config, offline Cargo metadata, or Poetry source constraints (Python 3.11+). Unsupported sources return unknown without public requests."},
 					"nuget_config": map[string]any{"type": "string", "description": "Absolute nuget.config file, used alone without configuration inheritance. Applies official package source mappings before public requests."},
 					"ecosystem": map[string]any{
@@ -375,6 +385,9 @@ func sourceCommand(full string, query models.Query) string {
 	}
 	if query.NuGetConfig != "" {
 		flags += " --nuget-config " + shellQuote(query.NuGetConfig)
+	}
+	if query.BundlerLock != "" {
+		flags += " --bundler-lock " + shellQuote(query.BundlerLock)
 	}
 	if flags == "" {
 		return full

@@ -644,3 +644,37 @@ Official references: [Go environment configuration](https://pkg.go.dev/cmd/go#hd
 [Cargo metadata](https://doc.rust-lang.org/cargo/commands/cargo-metadata.html),
 [Poetry package source constraints](https://python-poetry.org/docs/repositories/#package-source-constraint),
 [Python TOML parser](https://docs.python.org/3/library/tomllib.html).
+
+### Bundler locked gem sources
+
+Select a resolved Bundler lockfile explicitly:
+
+```sh
+deptrust check --json --bundler-lock /absolute/path/to/Gemfile.lock rubygems internal_gem 1.2.3
+```
+
+Use `bundler_lock` in MCP calls. The option works for checks, suggestions, and
+comparisons; follow-up commands preserve it. It cannot be combined with
+`project_dir` or `nuget_config`.
+
+DepTrust uses the installed Ruby/Bundler `LockfileParser` to read resolved gem
+sources. This follows the source recorded after Bundler resolves per-gem `source:`
+options and source blocks. Only gems exclusively associated with the HTTPS
+RubyGems.org source proceed to public checks. Custom sources, mixed remotes,
+missing gems, and source uncertainty return `unknown` without public requests.
+For this initial support, a lockfile containing any Git, path, or plugin source
+also returns `unknown`, including for unrelated public gems; these source objects
+are not constructed. Credential URLs never appear in results.
+
+This inspects the selected artifact only. It does not evaluate Gemfile, verify
+that the lockfile matches current Gemfile declarations, apply local source
+configuration overrides, install gems, run plugins, or update the lockfile.
+Keep the selected lockfile current before relying on its source assignments.
+A newer version suggested from a public source is not proof of compatibility with
+Gemfile constraints. Calls without this option retain public-registry behavior.
+Ruby and Bundler must be installed on PATH; unavailable tooling or an unreadable
+lockfile stops the operation before public requests. `RUBYOPT` startup options
+are disabled for the parser subprocess.
+
+Official references: [Bundler per-gem sources and source blocks](https://guides.rubygems.org/gemfile/),
+[resolved lockfile sources](https://guides.rubygems.org/gemfile-lock/).
