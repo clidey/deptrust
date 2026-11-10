@@ -43,7 +43,7 @@ func readArtifactJSON(file string) (map[string]any, error) {
 		return nil, fmt.Errorf("cannot read selected source artifact")
 	}
 	var root map[string]any
-	if err := json.Unmarshal(data, &root); err != nil {
+	if err := json.Unmarshal(data, &root); err != nil || root == nil {
 		return nil, fmt.Errorf("invalid source JSON")
 	}
 	return root, nil
