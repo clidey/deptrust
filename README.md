@@ -556,3 +556,46 @@ public services.
 
 See the [official Go private-module documentation](https://go.dev/ref/mod#private-modules)
 for the underlying Go configuration and pattern semantics.
+
+### npm and NuGet package sources
+
+Select configuration explicitly before checking packages that might come from
+custom feeds. These options apply to `check`, `suggest`, and `compare`:
+
+```sh
+deptrust check --json --project-dir /absolute/path/to/project npm @company/library 1.2.3
+deptrust check --json --nuget-config /absolute/path/to/nuget.config nuget Company.Library 1.2.3
+```
+
+For MCP, pass `project_dir` (npm) or `nuget_config` (NuGet) on each tool call.
+Follow-up commands retain the selected configuration. No configuration is
+implicitly taken from the MCP server's working directory. Without these options,
+checks continue to use the public registries.
+
+- **npm:** requires npm on PATH and reads its effective configuration in the
+  selected directory using `npm config get`. Scope-specific registry mappings
+  take precedence over the default registry. npm handles its normal project,
+  user, global, and environment configuration. This does not infer privacy from
+  a scope name or `package.json` publishing restrictions. Private packages hosted
+  on registry.npmjs.org cannot be distinguished by registry selection alone.
+- **NuGet:** reads the selected config file alone, like NuGet's explicit
+  `--configfile` mode; machine, user, and parent-directory settings are not merged.
+  Use a consolidated config containing package sources and mappings. Exact package
+  IDs take precedence over prefixes, longer prefixes over shorter ones, and `*`
+  is the default. Matching is case-insensitive. Disabled sources are excluded.
+  Removal directives, duplicate source sections, and clears after entries are
+  rejected before network access; leading clears are accepted.
+
+Only an exclusive selection of the supported public source (npmjs.org or the
+NuGet v3 public index) proceeds to public checks. Custom, mixed, or unmapped
+sources return `unknown` with registry verification `unverified` and advisory
+coverage `none`. They are not labeled private: a custom feed may also be public
+or mirror public packages. Configuration errors stop the operation before public
+requests. DepTrust does not fetch from custom feeds or expose their URLs or
+credentials in results. This is source selection support, not authenticated
+private-package assessment or a dependency-graph scan.
+
+Official references: [npm scope registry mappings](https://docs.npmjs.com/cli/v11/using-npm/scope/),
+[npm configuration](https://docs.npmjs.com/cli/v11/using-npm/config/),
+[NuGet source mapping and precedence](https://learn.microsoft.com/en-us/nuget/consume-packages/package-source-mapping),
+[NuGet configuration selection](https://learn.microsoft.com/en-us/nuget/consume-packages/configuring-nuget-behavior).
