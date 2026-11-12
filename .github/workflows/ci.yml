@@ -5,14 +5,20 @@ on:
     branches:
       - main
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     branches:
       - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
 
 jobs:
   lint:
+    if: github.event.pull_request.draft != true
     name: Go Lint
     runs-on: ubuntu-latest
 
@@ -36,6 +42,7 @@ jobs:
         run: ./lint.sh
 
   test:
+    if: github.event.pull_request.draft != true
     name: Test
     runs-on: ubuntu-latest
 

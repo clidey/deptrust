@@ -20,6 +20,7 @@ on:
       - ".github/workflows/nix.yml"
       - ".github/workflows/release.yml"
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     branches: [main]
     paths:
       - "flake.nix"
@@ -38,6 +39,7 @@ concurrency:
 
 jobs:
   check:
+    if: github.event.pull_request.draft != true
     name: nix flake check
     runs-on: ubuntu-latest
     timeout-minutes: 20

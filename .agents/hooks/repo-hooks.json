@@ -1,0 +1,10 @@
+{
+  "after_edit": [
+    {"paths": ["*.go"], "run": "gofmt -w {files}"}
+  ],
+  "before_finish": [
+    {"paths": ["*.go", "go.mod", "go.sum", ".golangci.yml"], "run": "./lint.sh"},
+    {"paths": ["*.go", "go.mod", "go.sum"], "run": "go test ./..."},
+    {"paths": ["README.md"], "run": "go test ./internal/models/ -run TestEcosystemListsNameEveryEcosystem"}
+  ]
+}
