@@ -6,6 +6,7 @@ These apply in every clidey repository, for people and agents alike.
 
 - **Commits:** ask once before the first commit. Once the user says yes, keep committing that work without asking again; push only when they've asked for it.
 - **No AI attribution, anywhere:** commits, PRs, issues, comments and releases carry no `Co-Authored-By:` for Claude, Codex or any other agent, and no "Generated with" lines.
+- **External posts:** before posting anything outside this machine (GitHub issues, PRs, comments and reviews, advisory comments or edits, chat or email), show the user the exact text and wait for a yes.
 - **Never, whatever the instruction:** publish packages or releases, push images, deploy to UAT or production, or run anything against production. Build images and run build scripts only locally, to test. Prepare the command and hand it to the user.
 - **Cluster and cloud commands:** read-only `kubectl`, `helm` and `gcloud` commands run without asking, and in UAT so do day-to-day operations: restarting a rollout, deleting pods, config maps and jobs, scaling, `exec`, `cp` and port-forwarding. Never anything against production. Anything else that writes, deletes or shows secret values (including `apply`, `patch`, `set` and rollbacks), and anything that writes to a WhoDB organisation: show the exact command and wait for a yes.
 - **Branches and worktrees:** never create a branch or worktree, or switch branches, unless the user asked. If the work seems to need one, ask first; this is a required question.
@@ -30,6 +31,8 @@ gofmt -l .                            # CI fails if this prints any file
 ```
 
 CI (`.github/workflows/ci.yml`) runs `./lint.sh`, a `gofmt -l` check, `go test ./...`, `go build`, and `npm pack --dry-run`. There is no `-short` gating — `internal/registry/integration_test.go` makes real network calls and runs as part of `go test ./...`.
+
+Privacy regression tests prove a private source never reaches a public lookup: `App` with a nil registry and `forbiddenPrivateProvider` (panics if queried) in `internal/app`, the `sourcetest.Guard` HTTP tripwire, `credential-sentinel` values that must never appear in output, and the `e2e/` proxy tripwire (`DEPTRUST_TEST_E2E=1`). Reuse these for new source handling.
 
 ## Architecture
 
