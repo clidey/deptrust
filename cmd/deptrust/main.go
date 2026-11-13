@@ -59,16 +59,26 @@ func run(args []string, stdout, stderr io.Writer) error {
 }
 
 func runSetup(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
-	var codex, claude bool
+	var codex, claude, refresh, skill bool
 	for _, arg := range args {
 		switch arg {
 		case "--codex-mcp":
 			codex = true
 		case "--claude-code-mcp":
 			claude = true
+		case "--refresh":
+			refresh = true
+		case "--skill":
+			skill = true
 		default:
-			return errors.New("usage: deptrust setup [--codex-mcp] [--claude-code-mcp]")
+			return errors.New("usage: deptrust setup [--codex-mcp] [--claude-code-mcp], or deptrust setup --refresh, or deptrust setup --skill")
 		}
+	}
+	if refresh && (codex || claude || skill) {
+		return errors.New("--refresh updates existing integrations only; do not combine it with integration selection flags")
+	}
+	if skill && (codex || claude) {
+		return errors.New("use --skill on its own to install the skill")
 	}
 	guided := !codex && !claude
 
@@ -83,6 +93,17 @@ func runSetup(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	executable, err := filepath.Abs(executable)
 	if err != nil {
 		return fmt.Errorf("resolve deptrust executable: %w", err)
+	}
+	executable = stableSetupExecutable(executable)
+	if refresh {
+		return refreshIntegrations(executable, stdout)
+	}
+	if skill {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return err
+		}
+		return configurePackageCheckSkill(home, true, stdout)
 	}
 
 	reader := bufio.NewReader(stdin)
@@ -333,6 +354,8 @@ Usage:
   deptrust compare [--json] [--project-dir <absolute-dir> | --nuget-config <absolute-file> | --bundler-lock <absolute-lockfile> | --source-file <absolute-file>] <ecosystem> <package> <from-version> <to-version>
   deptrust mcp
   deptrust setup [--codex-mcp] [--claude-code-mcp]
+  deptrust setup --refresh
+  deptrust setup --skill
   deptrust hook tool
   deptrust version
 

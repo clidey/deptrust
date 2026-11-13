@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { createWriteStream, existsSync, mkdirSync, chmodSync, copyFileSync, rmSync, cpSync, renameSync, readFileSync, writeFileSync, accessSync, constants } from "node:fs";
+import { createWriteStream, existsSync, mkdirSync, chmodSync, copyFileSync, rmSync, renameSync, readFileSync, writeFileSync, accessSync, realpathSync, constants } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -12,28 +12,30 @@ import https from "node:https";
 const repo = "clidey/deptrust";
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-main().catch((error) => {
-  console.error(`error: ${error.message}`);
-  process.exit(1);
-});
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((error) => {
+    console.error(`error: ${error.message}`);
+    process.exit(1);
+  });
+}
 
-async function main() {
-  const args = process.argv.slice(2);
+async function main(args = process.argv.slice(2), install = installBinary) {
   if (args.length === 0 || args.includes("-h") || args.includes("--help")) {
     printUsage();
     return;
   }
 
   const command = args[0];
-  if (command === "install") {
+  if (command === "install" || command === "upgrade") {
     const options = parseOptions(args.slice(1));
+    if (command === "upgrade") {
+      options.guided = false;
+      options.yes = true;
+      options.upgrade = true;
+    }
     await maybePromptInstallOptions(options);
     await confirmInstallPlan(options);
-    const installPath = await installBinary(options);
-    await maybeInstallSkill(options);
-    maybeRegisterMCP(options, installPath);
-    maybeInstallHook(options, installPath);
-    printNextSteps(installPath);
+    await runInstallation(options, install);
     return;
   }
 
@@ -49,9 +51,7 @@ async function main() {
     const options = parseOptions(args.slice(2));
     options.codexSkill = true;
     await confirmInstallPlan(options);
-    const installPath = await installBinary(options);
-    await maybeInstallSkill(options);
-    printNextSteps(installPath);
+    await runInstallation(options);
     return;
   }
 
@@ -62,10 +62,7 @@ async function main() {
       options.claudeCodeMCP = true;
     }
     await confirmInstallPlan(options);
-    const installPath = await installBinary(options);
-    maybeRegisterMCP(options, installPath);
-    maybeInstallHook(options, installPath);
-    printNextSteps(installPath);
+    await runInstallation(options);
     return;
   }
 
@@ -147,7 +144,29 @@ function applyDefaultUninstallSelection(options) {
   options.hook = true;
 }
 
-async function installBinary(options) {
+async function runInstallation(options, install = installBinary) {
+  const installPath = await install(options);
+  await maybeInstallSkill(options, installPath);
+  maybeRegisterMCP(options, installPath);
+  maybeInstallHook(options, installPath);
+  let refreshed = true;
+  try {
+    run(installPath, ["setup", "--refresh"]);
+  } catch {
+    refreshed = false;
+    console.warn(`deptrust was installed successfully, but existing agent settings could not be refreshed. Fix the configuration error above, then run:\n  ${shellQuote(installPath)} setup --refresh`);
+  }
+  if (options.upgrade) {
+    console.log(refreshed
+      ? "Upgrade complete. Your existing agent setup is ready; restart active agent sessions to reload running MCP servers."
+      : "Binary upgrade complete. Agent settings still need refreshing.");
+  } else {
+    printNextSteps(installPath);
+  }
+  return installPath;
+}
+
+async function installBinary(options, fetchRelease = download) {
   const version = options.version === "latest" ? await withSpinner("Resolving latest deptrust release", latestVersion) : normalizeVersion(options.version);
   const target = platformTarget();
   const archiveName = `deptrust_${version}_${target.goos}_${target.goarch}.${target.extension}`;
@@ -162,12 +181,12 @@ async function installBinary(options) {
   mkdirSync(options.binDir, { recursive: true });
 
   console.log(`Downloading ${url}`);
-  await withSpinner(`Downloading ${archiveName}`, () => download(url, archivePath));
+  await withSpinner(`Downloading ${archiveName}`, () => fetchRelease(url, archivePath));
   console.log(`Extracting ${archiveName}`);
   run("tar", ["-xf", archivePath, "-C", extractDir]);
 
   const source = join(extractDir, archiveName.replace(`.${target.extension}`, ""), binaryName);
-  const installPath = join(options.binDir, binaryName);
+  const installPath = resolve(options.binDir, binaryName);
   if (!existsSync(source)) {
     throw new Error(`release archive did not contain ${binaryName}`);
   }
@@ -178,11 +197,18 @@ async function installBinary(options) {
     run("codesign", ["--verify", "--strict", source]);
   }
 
-  copyFileSync(source, installPath);
-  chmodSync(installPath, 0o755);
-
-  if (options.check && !existsSync(installPath)) {
-    throw new Error(`install check failed: ${installPath} does not exist`);
+  const checked = spawnSync(source, ["version"], { encoding: "utf8", timeout: 10_000 });
+  if (checked.status !== 0 || checked.stdout?.split(/\r?\n/, 1)[0] !== `deptrust ${version}`) {
+    throw new Error(`downloaded binary did not report deptrust ${version}; existing installation was left unchanged`);
+  }
+  // Replace the directory entry instead of truncating a running executable.
+  const staged = join(options.binDir, `.deptrust-update-${randomBytes(6).toString("hex")}`);
+  try {
+    copyFileSync(source, staged);
+    chmodSync(staged, 0o755);
+    renameSync(staged, installPath);
+  } finally {
+    rmSync(staged, { force: true });
   }
 
   rmSync(workDir, { recursive: true, force: true });
@@ -254,6 +280,7 @@ function printInstallPlan(options) {
   const installPath = join(options.binDir, binaryName);
   console.log("Here's what will be installed or updated (all user-level, nothing in your project):");
   console.log(`  Binary: ${installPath}`);
+  console.log("  Existing deptrust integrations and installed skills: refreshed; disabled integrations stay disabled");
   if (options.codexSkill) {
     console.log(`  Codex skill: ${join(homedir(), ".agents", "skills", "deptrust-package-check")}`);
   }
@@ -426,28 +453,10 @@ function platformTarget() {
   };
 }
 
-async function maybeInstallSkill(options) {
-  if (!options.codexSkill) {
-    return;
+async function maybeInstallSkill(options, installPath) {
+  if (options.codexSkill) {
+    run(installPath, ["setup", "--skill"]);
   }
-  const source = join(packageRoot, ".agents", "skills", "deptrust-package-check");
-  const target = join(homedir(), ".agents", "skills", "deptrust-package-check");
-  if (!existsSync(join(source, "SKILL.md"))) {
-    throw new Error("deptrust skill was not included in the npm package");
-  }
-  if (existsSync(target) && sameSkill(source, target)) {
-    return;
-  }
-  if (existsSync(target)) {
-    const backup = `${target}.bak-${Date.now()}`;
-    renameSync(target, backup);
-    console.warn(`Found a customized skill at ${target}, so we saved it to ${backup} before installing ours.`);
-  } else {
-    rmSync(target, { recursive: true, force: true });
-  }
-  mkdirSync(dirname(target), { recursive: true });
-  cpSync(source, target, { recursive: true });
-  console.log(`Updated the deptrust-package-check skill at ${target}.`);
 }
 
 function sameSkill(source, target) {
@@ -763,6 +772,7 @@ deptrust npm installer
 
 Usage:
   npx @clidey/deptrust install [options]
+  npx @clidey/deptrust@latest upgrade [options]
   npx @clidey/deptrust uninstall [options]
   npx @clidey/deptrust skills install [options]
   npx @clidey/deptrust mcp install [options]
@@ -776,11 +786,12 @@ Options:
   --hook                  Install Codex and Claude Code dependency safety hooks
   --all                   Install binary, Codex MCP, Codex skill, Claude Code MCP, and hook
                           For uninstall, remove Codex MCP, Codex skill, Claude Code MCP, and hook
-  --check                 Verify the binary exists after install
+  --check                 Accepted for compatibility; every install verifies its binary
   -y, --yes               Skip interactive confirmation
 
 Examples:
   npx @clidey/deptrust install
+  npx @clidey/deptrust@latest upgrade
   npx @clidey/deptrust install --yes
   npx @clidey/deptrust install --all
   npx @clidey/deptrust install --hook
@@ -790,3 +801,5 @@ Examples:
   npx @clidey/deptrust mcp install --codex-mcp
 `);
 }
+
+export { installBinary, main, parseOptions, runInstallation };

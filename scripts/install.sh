@@ -75,8 +75,9 @@ while [[ $# -gt 0 ]]; do
 done
 
 mkdir -p "$bin_dir"
+bin_dir="$(cd "$bin_dir" && pwd)"
 
-tmp_bin="$(mktemp "${TMPDIR:-/tmp}/deptrust.XXXXXX")"
+tmp_bin="$(mktemp "$bin_dir/.deptrust-update.XXXXXX")"
 cleanup() {
   rm -f "$tmp_bin"
 }
@@ -95,7 +96,8 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
 fi
 
 install_path="$bin_dir/deptrust"
-install -m 0755 "$tmp_bin" "$install_path"
+chmod 0755 "$tmp_bin"
+mv -f "$tmp_bin" "$install_path"
 echo "Installed deptrust to $install_path."
 
 if $install_codex_skill; then
@@ -111,6 +113,14 @@ if $install_claude_code_mcp; then
 fi
 if [[ ${#setup_args[@]} -gt 0 ]]; then
   "$install_path" setup "${setup_args[@]}"
+fi
+
+# Only existing integrations are refreshed. A config error must not turn a
+# successful binary installation into a failed install.
+if ! "$install_path" setup --refresh; then
+  echo "deptrust was installed successfully, but existing agent settings could not be refreshed." >&2
+  echo "Fix the configuration error above, then run:" >&2
+  printf '  %q setup --refresh\n' "$install_path" >&2
 fi
 
 if $run_check; then

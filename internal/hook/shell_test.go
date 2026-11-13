@@ -50,7 +50,10 @@ func TestParseInstallCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ParseInstallCommand(tt.cmd)
+			got, err := ParseInstallCommand(tt.cmd)
+			if err != nil {
+				t.Fatal(err)
+			}
 			if len(got) != len(tt.want) {
 				t.Fatalf("ParseInstallCommand() = %#v, want %#v", got, tt.want)
 			}
@@ -102,7 +105,10 @@ func TestParseHookInputFromWrite(t *testing.T) {
 		},
 	}
 	want := []packageRequest{{Ecosystem: "github-actions", Name: "actions/setup-go", Version: "v6.1.0"}}
-	got := ParseHookInput(input)
+	got, err := ParseHookInput(input)
+	if err != nil {
+		t.Fatal(err)
+	}
 	assertRequests(t, got, want)
 }
 
@@ -118,7 +124,10 @@ func TestParseHookInputDedupesCommandAndWorkflow(t *testing.T) {
 		{Ecosystem: "npm", Name: "lodash", Version: "4.17.21"},
 		{Ecosystem: "github-actions", Name: "actions/checkout", Version: "v4"},
 	}
-	got := ParseHookInput(input)
+	got, err := ParseHookInput(input)
+	if err != nil {
+		t.Fatal(err)
+	}
 	assertRequests(t, got, want)
 }
 

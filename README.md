@@ -263,9 +263,30 @@ npx @clidey/deptrust install
 pnpx @clidey/deptrust@latest install
 ```
 
-The default installer is guided. It installs the binary, asks which agent integrations to configure, prints the user-level destinations before changing anything, and asks for confirmation. The guided installer defaults to enabling MCP, the skill fallback, and dependency safety hooks for Codex and Claude Code. Add `--yes` for non-interactive binary-only installs, or pass explicit integration flags.
+The default installer is guided. It installs the binary, asks which agent integrations to configure, prints the user-level destinations before changing anything, and asks for confirmation. The guided installer defaults to enabling MCP, the skill fallback, and dependency safety hooks for Codex and Claude Code. Add `--yes` to install without prompts or enabling new integrations, or pass explicit integration flags. Existing registrations are refreshed during installation.
 
 Rerunning the installer is safe. It silently leaves unchanged MCP, skill, and hook configuration alone. If an integration points at an old deptrust binary or its managed configuration has changed, the installer updates it automatically; users do not need to manually remove and re-add MCP servers. Customized skills are backed up before replacement.
+
+To upgrade the binary and refresh your existing agent setup, run one command:
+
+```bash
+npx @clidey/deptrust@latest upgrade
+```
+
+No setup questions or integration flags are needed. Existing local MCP and hook
+registrations are updated in place, installed skills are refreshed with backups,
+and integrations you haven't enabled stay disabled. The installer verifies the
+downloaded binary's version before replacing the old executable at the same
+location. If you originally chose a custom `--bin-dir`, pass that same directory
+when upgrading. Updating the npm wrapper alone does not update the Go binary;
+the command above handles both. Restart active agent sessions to reload any
+already-running MCP server.
+
+The npm installer and `scripts/install.sh` automatically refresh integrations
+you already enabled. They do not ask again or enable new integrations. If an
+automatic refresh fails, the binary installation still succeeds and prints
+the exact `setup --refresh` repair command; existing configuration errors are
+reported instead of silently discarded.
 
 To remove the user-level binary, skill, and MCP entries:
 
@@ -295,6 +316,28 @@ deptrust setup
 ```
 
 The guided setup asks before enabling MCP and dependency safety hooks. It leaves registrations that already use the current binary alone, and reconciles existing DepTrust registrations that point to an older npm, Homebrew, or source-install path.
+
+Homebrew setup uses the stable `opt/deptrust/bin/deptrust` path when available,
+so subsequent `brew upgrade deptrust` runs do not need another guided setup. Existing
+registrations that still contain a versioned Cellar path can be migrated once
+with `deptrust setup --refresh`. This non-interactive command only refreshes
+existing local user registrations; remote MCP servers and custom wrappers are
+left alone. It preserves MCP environment settings, hook options, and unrelated
+configuration.
+
+After upgrading through Homebrew, Go, Nix, a manual download, or another package
+manager, `deptrust setup --refresh` also updates any existing package-check skill
+from the binary itself. It needs neither npm nor a source checkout. Changed
+skills are backed up in full before replacement; unchanged skills are left
+alone. It never enables an absent skill. For a first-time skill installation,
+run `deptrust setup --skill` explicitly.
+
+Homebrew's isolated post-install environment cannot reliably access user agent
+settings, so the formula prints the refresh command instead of attempting it
+inside post-install. Direct `go install`, Nix profile updates, and manual binary
+replacement also require running `deptrust setup --refresh` explicitly when you
+want to refresh installed skill files or migrate registrations. No background
+updater or automatic agent restart is installed.
 
 Go users can install directly:
 
@@ -359,6 +402,29 @@ pnpx @clidey/deptrust@latest install --all
 `--all` installs the binary, registers Codex MCP when the `codex` CLI is available, installs the Codex skill fallback, registers Claude Code MCP when the `claude` CLI is available, and installs the Codex and Claude Code dependency safety hooks.
 
 The hooks are `PreToolUse` hooks. They check package install commands before they run, and they also check GitHub Actions added to workflow files through agent file-edit tools. A hook blocks the tool call when deptrust returns `review`, `block`, or `unknown`. The installer writes user-level hook config only: `~/.codex/hooks.json` for Codex and `~/.claude/settings.json` for Claude Code.
+
+Install inspection accepts a deliberately simple format: one standalone command
+with literal package names and versions, such as `pnpm add @scope/pkg@1.2.3`,
+`pip install requests==2.32.3`, or
+`dotnet add package Example --version 1.0.0`. Multiple literal packages are
+supported where the package manager allows them. An omitted version means
+`latest`. The hook does not attempt to interpret shell programs.
+
+If an install-like command contains redirects (including `2>&1`), command
+chaining, quotes, variables, substitutions, ranges, local paths, wrappers, or
+unsupported options, the hook denies that attempt before package lookups and asks
+the agent to retry with simpler input. It never checks a partial package list and
+treats that as complete. Directory changes should be separate tool calls. Only
+the version options shown above (`--version`, or `-v` for Ruby tools) and Maven's
+`dependency:get -Dartifact=group:artifact:version` form are accepted as options;
+other necessary options and source settings require an explicit source-aware
+check, not silently removing their meaning from the install.
+
+This is inspection of recognized explicit package installs, not a shell security
+boundary or a complete detector of arbitrary scripts. Install commands without
+explicit package names do not audit the manifest or lockfile. Unknown tools,
+aliases and dynamically constructed command names are outside this hook's
+coverage; use explicit checks for their dependencies.
 
 When the `gh` CLI is available, guided setup also offers to use its existing local login for hook checks. This writes only `DEPTRUST_GITHUB_AUTH=gh`, never a GitHub token, so hook subprocesses can avoid unauthenticated GitHub API rate limits.
 

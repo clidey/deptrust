@@ -37,8 +37,11 @@ class Deptrust < Formula
 
   def caveats
     <<~EOS
-      To configure Codex and Claude Code with the guided setup, run:
-        deptrust setup
+      To refresh existing integrations after installing or upgrading, run:
+        #{opt_bin}/deptrust setup --refresh
+
+      For first-time Codex and Claude Code setup, run:
+        #{opt_bin}/deptrust setup
     EOS
   end
 

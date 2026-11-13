@@ -43,28 +43,15 @@ func RunShell(ctx context.Context, service app.App, in io.Reader, out io.Writer)
 		return nil
 	}
 
-	requests := ParseHookInput(input)
-	if len(requests) > 0 {
-		fields := strings.Fields(toolInputString(input.ToolInput, "command"))
-		for _, field := range fields {
-			// Shell quoting must not hide a literal source-override flag.
-			field = strings.NewReplacer(`"`, "", `'`, "").Replace(field)
-			flag, _, _ := strings.Cut(field, "=")
-			if strings.HasPrefix(field, "-P") || (strings.HasPrefix(field, "-D") && !strings.HasPrefix(field, "-Dartifact=")) || (strings.HasPrefix(field, "-s") && !strings.HasPrefix(field, "--")) || strings.HasPrefix(field, "-gs") {
-				return deny(out, "deptrust cannot infer project profiles/properties/settings from install flags; run a check with the same explicit source context")
-			}
-
-			switch flag {
-			case "--registry", "--index-url", "--extra-index-url", "--source", "--repository", "--configfile", "--directory", "--prefix", "--cwd", "-C", "-i", "--find-links", "--no-index", "--config", "--userconfig", "--globalconfig", "--settings", "-s", "--project", "--manifest-path", "--activate-profiles", "--global-settings", "--init-script", "-I", "--project-prop":
-				return deny(out, "deptrust cannot establish source context for this install override; run an explicit source-aware check before installing")
-			}
-		}
+	requests, err := ParseHookInput(input)
+	if err != nil {
+		return deny(out, err.Error())
 	}
 
 	for _, request := range requests {
 		query, err := app.ParseQuery(request.Ecosystem, request.Name, request.Version)
 		if err != nil {
-			continue
+			return deny(out, simpleInstallReason)
 		}
 
 		query.ProjectDir = input.SourceContext.ProjectDir
@@ -101,16 +88,20 @@ func RunShell(ctx context.Context, service app.App, in io.Reader, out io.Writer)
 	return nil
 }
 
-func ParseHookInput(input hookInput) []packageRequest {
+func ParseHookInput(input hookInput) ([]packageRequest, error) {
 	var out []packageRequest
 	if command := toolInputString(input.ToolInput, "command"); command != "" {
-		out = append(out, ParseInstallCommand(command)...)
+		requests, err := ParseInstallCommand(command)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, requests...)
 	}
 	out = append(out, parseGitHubActionsToolInput(input)...)
-	return dedupeRequests(out)
+	return dedupeRequests(out), nil
 }
 
-func ParseInstallCommand(command string) []packageRequest {
+func parseLiteralInstallCommand(command string) []packageRequest {
 	fields := strings.Fields(command)
 	if len(fields) == 0 {
 		return nil

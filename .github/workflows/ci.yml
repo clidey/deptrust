@@ -72,6 +72,9 @@ jobs:
       - name: Test
         run: go test ./...
 
+      - name: Test installer upgrades
+        run: node --test scripts/npm-install.test.mjs
+
       - name: Build
         run: go build -o deptrust ./cmd/deptrust
 
