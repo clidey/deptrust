@@ -150,12 +150,13 @@ func inspectMavenSources(ctx context.Context, q models.Query, dir, output string
 }
 
 func classifyJVMRepositories(declared bool, repositories []string) (string, error) {
-	const reason = "Effective JVM project does not exclusively establish this declared module from Maven Central; public requests were skipped. Assessment is unavailable."
+	const reason = "Effective JVM project does not exclusively establish this declared module from Maven Central or Google Maven; public requests were skipped. Assessment is unavailable."
 	if !declared || len(repositories) == 0 {
 		return reason, nil
 	}
 	for _, repository := range repositories {
-		if !publicSource(repository, "repo.maven.apache.org", "/maven2") && !publicSource(repository, "repo1.maven.org", "/maven2") {
+		if !publicSource(repository, "repo.maven.apache.org", "/maven2") && !publicSource(repository, "repo1.maven.org", "/maven2") &&
+			!publicSource(repository, "dl.google.com", "/dl/android/maven2") && !publicSource(repository, "maven.google.com", "") {
 			return reason, nil
 		}
 	}

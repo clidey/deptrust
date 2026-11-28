@@ -46,12 +46,12 @@ gradle.projectsEvaluated {
                     }
                 }
             }
-            // Resolve metadata offline only when every candidate endpoint is Central.
+            // Resolve metadata offline only when every candidate endpoint is a supported public repository.
             // Public APIs distinguish module artifacts from local substitutions.
-            def central = repositories && repositories.every { uri ->
-                uri.replaceAll('/+$', '') in ['https://repo.maven.apache.org/maven2', 'https://repo1.maven.org/maven2']
+            def publicRepositories = repositories && repositories.every { uri ->
+                uri.replaceAll('/+$', '') in ['https://repo.maven.apache.org/maven2', 'https://repo1.maven.org/maven2', 'https://dl.google.com/dl/android/maven2', 'https://maven.google.com']
             }
-            if (declared && central && !unsupported) {
+            if (declared && publicRepositories && !unsupported) {
                 try {
                     candidateConfigurations.each { configuration ->
                         def edges = configuration.incoming.resolutionResult.root.dependencies.findAll { edge ->

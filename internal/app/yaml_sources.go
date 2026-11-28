@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/clidey/deptrust/internal/models"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 func readArtifactYAML(file string) (map[string]any, error) {

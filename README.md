@@ -848,7 +848,8 @@ required parent POMs, extensions, plugins, and metadata in advance. Select the
 actual project/subproject directory whose declared direct dependency is being
 checked. Arbitrary transitive queries and undeclared modules remain `unknown`.
 
-Only exclusively Maven Central endpoints permit a public assessment. Custom,
+DepTrust checks Maven Central first and tries Google Maven when Central returns a package 404.
+Project assessments require every effective repository to be Maven Central or Google Maven. Custom,
 mixed, Ivy/local, or uncertain source sets return `unknown`, including mixed
 Gradle repositories where a content filter might exclude the private source for
 this particular module. The implementation does not use internal filter APIs or

@@ -3,6 +3,7 @@ package registry
 import (
 	"context"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -13,6 +14,8 @@ import (
 )
 
 const mavenCentralBaseURL = "https://repo.maven.apache.org/maven2"
+
+const googleMavenBaseURL = "https://dl.google.com/dl/android/maven2"
 
 type mavenMetadata struct {
 	Versioning struct {
@@ -39,7 +42,15 @@ func resolveMaven(ctx context.Context, client HTTPClient, query models.Query) (V
 		return VersionInfo{}, err
 	}
 
-	metadata, metadataErr := fetchMavenMetadata(ctx, client, groupID, artifactID, query.Package)
+	baseURL := mavenCentralBaseURL
+	metadata, metadataErr := fetchMavenMetadata(ctx, client, baseURL, groupID, artifactID, query.Package)
+	var missing PackageNotFoundError
+	if errors.As(metadataErr, &missing) {
+		metadata, metadataErr = fetchMavenMetadata(ctx, client, googleMavenBaseURL, groupID, artifactID, query.Package)
+		if metadataErr == nil {
+			baseURL = googleMavenBaseURL
+		}
+	}
 
 	versionSet := map[string]struct{}{}
 	latest := ""
@@ -99,7 +110,7 @@ func resolveMaven(ctx context.Context, client HTTPClient, query models.Query) (V
 
 	publishedAtByVersion := mavenSearchPublishedAt(search, versionSet)
 	if publishedAtByVersion[requested] == nil {
-		publishedAtByVersion[requested] = fetchMavenPublishedAt(ctx, client, groupID, artifactID, requested)
+		publishedAtByVersion[requested] = fetchMavenPublishedAt(ctx, client, baseURL, groupID, artifactID, requested)
 	}
 
 	return VersionInfo{
@@ -113,8 +124,8 @@ func resolveMaven(ctx context.Context, client HTTPClient, query models.Query) (V
 	}, nil
 }
 
-func fetchMavenMetadata(ctx context.Context, client HTTPClient, groupID, artifactID, packageName string) (mavenMetadata, error) {
-	metadataURL := mavenCentralBaseURL + "/" + mavenArtifactPath(groupID, artifactID) + "/maven-metadata.xml"
+func fetchMavenMetadata(ctx context.Context, client HTTPClient, baseURL, groupID, artifactID, packageName string) (mavenMetadata, error) {
+	metadataURL := baseURL + "/" + mavenArtifactPath(groupID, artifactID) + "/maven-metadata.xml"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, metadataURL, nil)
 	if err != nil {
 		return mavenMetadata{}, err
@@ -169,10 +180,10 @@ func fetchMavenSearch(ctx context.Context, client HTTPClient, groupID, artifactI
 	return search, nil
 }
 
-func fetchMavenPublishedAt(ctx context.Context, client HTTPClient, groupID, artifactID, version string) *time.Time {
+func fetchMavenPublishedAt(ctx context.Context, client HTTPClient, baseURL, groupID, artifactID, version string) *time.Time {
 	artifactPath := mavenArtifactPath(groupID, artifactID)
 	pomName := url.PathEscape(artifactID) + "-" + url.PathEscape(version) + ".pom"
-	pomURL := mavenCentralBaseURL + "/" + artifactPath + "/" + url.PathEscape(version) + "/" + pomName
+	pomURL := baseURL + "/" + artifactPath + "/" + url.PathEscape(version) + "/" + pomName
 	req, err := http.NewRequestWithContext(ctx, http.MethodHead, pomURL, nil)
 	if err != nil {
 		return nil

@@ -203,6 +203,17 @@ func TestResolveMavenExactVersionFromCanonicalMetadata(t *testing.T) {
 	}
 }
 
+func TestResolveGoogleMaven(t *testing.T) {
+	client := fakeHTTPClient{responses: map[string]fakeResponse{
+		"/dl/android/maven2/androidx/core/core/maven-metadata.xml":     {status: 200, body: "<metadata><versioning><release>1.15.0</release><versions><version>1.15.0</version></versions></versioning></metadata>"},
+		"/dl/android/maven2/androidx/core/core/1.15.0/core-1.15.0.pom": {status: 200, header: http.Header{"Last-Modified": {"Mon, 02 Jan 2006 15:04:05 GMT"}}},
+	}}
+	got, err := resolveMaven(context.Background(), client, models.Query{Ecosystem: models.EcosystemMaven, Package: "androidx.core:core"})
+	if err != nil || got.Version != "1.15.0" || got.PublishedAt == nil {
+		t.Fatalf("Google Maven resolution = %+v, %v", got, err)
+	}
+}
+
 func TestResolveMavenRequiresGroupArtifact(t *testing.T) {
 	_, err := resolveMaven(context.Background(), fakeHTTPClient{}, models.Query{
 		Ecosystem: models.EcosystemMaven,
