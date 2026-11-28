@@ -6,9 +6,12 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
+	"github.com/clidey/deptrust/internal/registry"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -21,7 +24,7 @@ var mavenSourceInspector string
 //go:embed runtime/gradle-sources.init.gradle
 var gradleSourceInspector string
 
-func jvmProjectRestriction(ctx context.Context, q models.Query) (string, error) {
+func jvmProjectRestriction(ctx context.Context, q *models.Query) (string, error) {
 	has := func(file string) bool { _, err := os.Stat(filepath.Join(q.ProjectDir, file)); return err == nil }
 	maven := has("pom.xml")
 	gradle := has("settings.gradle") || has("settings.gradle.kts") || has("build.gradle") || has("build.gradle.kts")
@@ -66,10 +69,10 @@ func jvmProjectRestriction(ctx context.Context, q models.Query) (string, error) 
 	if err := json.Unmarshal(data, &report); err != nil || !report.Complete {
 		return "", fmt.Errorf("invalid Gradle source report")
 	}
-	return classifyJVMRepositories(report.Declared && !report.Unsupported && report.Resolved, report.Repositories)
+	return setJVMRepositories(q, report.Declared && !report.Unsupported && report.Resolved, report.Repositories)
 }
 
-func inspectMavenSources(ctx context.Context, q models.Query, dir, output string, env []string) (string, error) {
+func inspectMavenSources(ctx context.Context, q *models.Query, dir, output string, env []string) (string, error) {
 	version := exec.CommandContext(ctx, "mvn", "-Dstyle.color=never", "--version")
 	version.Env = env
 	info, err := version.Output()
@@ -131,6 +134,11 @@ func inspectMavenSources(ctx context.Context, q models.Query, dir, output string
 	}
 	complete, declared := false, false
 	var repositories []string
+	sort.SliceStable(report.Entries, func(i, j int) bool {
+		a, _ := strconv.Atoi(strings.TrimPrefix(report.Entries[i].Key, "source."))
+		b, _ := strconv.Atoi(strings.TrimPrefix(report.Entries[j].Key, "source."))
+		return a < b
+	})
 	for _, entry := range report.Entries {
 		switch entry.Key {
 		case "complete":
@@ -146,19 +154,28 @@ func inspectMavenSources(ctx context.Context, q models.Query, dir, output string
 	if !complete {
 		return "", fmt.Errorf("incomplete Maven source report")
 	}
-	return classifyJVMRepositories(declared, repositories)
+	return setJVMRepositories(q, declared, repositories)
 }
 
-func classifyJVMRepositories(declared bool, repositories []string) (string, error) {
-	const reason = "Effective JVM project does not exclusively establish this declared module from Maven Central or Google Maven; public requests were skipped. Assessment is unavailable."
+func setJVMRepositories(q *models.Query, declared bool, repositories []string) (string, error) {
+	const reason = "Effective JVM project does not exclusively establish this declared module from supported public Maven repositories; public requests were skipped. Assessment is unavailable."
 	if !declared || len(repositories) == 0 {
 		return reason, nil
 	}
 	for _, repository := range repositories {
-		if !publicSource(repository, "repo.maven.apache.org", "/maven2") && !publicSource(repository, "repo1.maven.org", "/maven2") &&
-			!publicSource(repository, "dl.google.com", "/dl/android/maven2") && !publicSource(repository, "maven.google.com", "") {
+		switch {
+		case publicSource(repository, "repo.maven.apache.org", "/maven2"), publicSource(repository, "repo1.maven.org", "/maven2"):
+			repository = "https://repo.maven.apache.org/maven2"
+		case publicSource(repository, "dl.google.com", "/dl/android/maven2"), publicSource(repository, "maven.google.com", ""):
+			repository = "https://dl.google.com/dl/android/maven2"
+		case publicSource(repository, "plugins.gradle.org", "/m2"):
+			repository = registry.PluginPortalURL
+		case publicSource(repository, "www.jetbrains.com", "/intellij-repository/releases"), publicSource(repository, "cache-redirector.jetbrains.com", "/www.jetbrains.com/intellij-repository/releases"):
+			repository = registry.IntelliJReleasesURL
+		default:
 			return reason, nil
 		}
+		q.MavenRepositories = appendUniqueString(q.MavenRepositories, repository)
 	}
 	return "", nil
 }

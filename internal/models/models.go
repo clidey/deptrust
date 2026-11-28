@@ -126,13 +126,14 @@ func (e Ecosystem) GitHubEcosystem() string {
 }
 
 type Query struct {
-	SourceFile  string    `json:"source_file,omitempty"`
-	BundlerLock string    `json:"bundler_lock,omitempty"`
-	ProjectDir  string    `json:"project_dir,omitempty"`
-	NuGetConfig string    `json:"nuget_config,omitempty"`
-	Ecosystem   Ecosystem `json:"ecosystem"`
-	Package     string    `json:"package"`
-	Version     string    `json:"version,omitempty"`
+	MavenRepositories []string  `json:"-"`
+	SourceFile        string    `json:"source_file,omitempty"`
+	BundlerLock       string    `json:"bundler_lock,omitempty"`
+	ProjectDir        string    `json:"project_dir,omitempty"`
+	NuGetConfig       string    `json:"nuget_config,omitempty"`
+	Ecosystem         Ecosystem `json:"ecosystem"`
+	Package           string    `json:"package"`
+	Version           string    `json:"version,omitempty"`
 }
 
 func (q Query) Validate() error {

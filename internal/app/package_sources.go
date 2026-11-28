@@ -13,9 +13,8 @@ import (
 	"github.com/clidey/deptrust/internal/models"
 )
 
-// sourceRestriction checks only explicitly selected package-manager configuration.
-// Configuration failures stop assessment before any public request.
-func sourceRestriction(ctx context.Context, query models.Query) (string, error) {
+func prepareSources(ctx context.Context, prepared *models.Query) (string, error) {
+	query := *prepared
 	selected := 0
 	for _, value := range []string{query.ProjectDir, query.NuGetConfig, query.BundlerLock, query.SourceFile} {
 		if value != "" {
@@ -70,7 +69,7 @@ func sourceRestriction(ctx context.Context, query models.Query) (string, error) 
 		}
 		switch query.Ecosystem {
 		case models.EcosystemMaven:
-			return jvmProjectRestriction(ctx, query)
+			return jvmProjectRestriction(ctx, prepared)
 		case models.EcosystemNuGet:
 			return nugetProjectRestriction(ctx, query)
 		case models.EcosystemNPM:

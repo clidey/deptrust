@@ -146,3 +146,9 @@ func TestNuGetOrderedCollectionOperations(t *testing.T) {
 		}
 	}
 }
+
+// sourceRestriction checks only explicitly selected package-manager configuration.
+// Configuration failures stop assessment before any public request.
+func sourceRestriction(ctx context.Context, query models.Query) (string, error) {
+	return prepareSources(ctx, &query)
+}

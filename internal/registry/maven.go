@@ -5,8 +5,10 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -42,16 +44,39 @@ func resolveMaven(ctx context.Context, client HTTPClient, query models.Query) (V
 		return VersionInfo{}, err
 	}
 
-	baseURL := mavenCentralBaseURL
-	metadata, metadataErr := fetchMavenMetadata(ctx, client, baseURL, groupID, artifactID, query.Package)
-	var missing PackageNotFoundError
-	if errors.As(metadataErr, &missing) {
-		metadata, metadataErr = fetchMavenMetadata(ctx, client, googleMavenBaseURL, groupID, artifactID, query.Package)
-		if metadataErr == nil {
-			baseURL = googleMavenBaseURL
+	repositories := query.MavenRepositories
+	if len(repositories) == 0 {
+		repositories = []string{mavenCentralBaseURL, googleMavenBaseURL, PluginPortalURL, IntelliJReleasesURL}
+		if artifactID == groupID+".gradle.plugin" {
+			repositories = []string{PluginPortalURL, mavenCentralBaseURL, googleMavenBaseURL, IntelliJReleasesURL}
+		}
+	}
+	var metadata mavenMetadata
+	var metadataErr error
+	var baseURL string
+	requested := strings.TrimSpace(query.Version)
+	projectPin := len(query.MavenRepositories) > 0 && requested != "" && !strings.EqualFold(requested, models.LatestVersion)
+	var firstMetadata *mavenMetadata
+	for _, repository := range repositories {
+		baseURL = repository
+		metadata, metadataErr = fetchMavenMetadata(ctx, client, baseURL, groupID, artifactID, query.Package)
+		if metadataErr == nil && projectPin && !slices.Contains(metadata.Versioning.Versions, requested) {
+			if firstMetadata == nil {
+				first := metadata
+				firstMetadata = &first
+			}
+			continue
+		}
+		var missing PackageNotFoundError
+		if !errors.As(metadataErr, &missing) {
+			break
 		}
 	}
 
+	if firstMetadata != nil && (metadataErr == nil || errors.As(metadataErr, new(PackageNotFoundError))) && !slices.Contains(metadata.Versioning.Versions, requested) {
+		metadata = *firstMetadata
+		metadataErr = nil
+	}
 	versionSet := map[string]struct{}{}
 	latest := ""
 	search := mavenSearchResponse{}
@@ -67,10 +92,11 @@ func resolveMaven(ctx context.Context, client HTTPClient, query models.Query) (V
 
 	// Maven Search is a fallback for availability, not the authority or part of
 	// the successful path. Its index can lag behind Maven Central or time out.
-	if len(versionSet) == 0 {
+	if len(versionSet) == 0 && len(query.MavenRepositories) == 0 {
 		var searchErr error
 		search, searchErr = fetchMavenSearch(ctx, client, groupID, artifactID)
 		if searchErr == nil {
+			baseURL = mavenCentralBaseURL
 			for _, doc := range search.Response.Docs {
 				if doc.Version != "" {
 					versionSet[doc.Version] = struct{}{}
@@ -94,7 +120,6 @@ func resolveMaven(ctx context.Context, client HTTPClient, query models.Query) (V
 		latest = versions[0]
 	}
 
-	requested := strings.TrimSpace(query.Version)
 	if requested == "" || strings.EqualFold(requested, models.LatestVersion) {
 		requested = latest
 	}
@@ -113,7 +138,15 @@ func resolveMaven(ctx context.Context, client HTTPClient, query models.Query) (V
 		publishedAtByVersion[requested] = fetchMavenPublishedAt(ctx, client, baseURL, groupID, artifactID, requested)
 	}
 
+	var implementation *models.PackageVersion
+	if artifactID == groupID+".gradle.plugin" {
+		implementation, err = markerImplementation(ctx, client, baseURL, groupID, artifactID, requested)
+		if err != nil {
+			return VersionInfo{}, err
+		}
+	}
 	return VersionInfo{
+		Implementation:       implementation,
 		Ecosystem:            query.Ecosystem,
 		Package:              query.Package,
 		Version:              requested,
@@ -146,7 +179,7 @@ func fetchMavenMetadata(ctx context.Context, client HTTPClient, baseURL, groupID
 	}
 
 	var metadata mavenMetadata
-	if err := xml.NewDecoder(resp.Body).Decode(&metadata); err != nil {
+	if err := mavenXMLDecoder(resp.Body).Decode(&metadata); err != nil {
 		return mavenMetadata{}, fmt.Errorf("decode Maven metadata: %w", err)
 	}
 	return metadata, nil
@@ -250,4 +283,54 @@ func mavenPublishedAt(timestampMillis int64) *time.Time {
 	}
 	parsed := time.UnixMilli(timestampMillis).UTC()
 	return &parsed
+}
+
+const PluginPortalURL = "https://plugins.gradle.org/m2"
+const IntelliJReleasesURL = "https://www.jetbrains.com/intellij-repository/releases"
+
+func markerImplementation(ctx context.Context, client HTTPClient, base, group, artifact, version string) (*models.PackageVersion, error) {
+	path := base + "/" + mavenArtifactPath(group, artifact) + "/" + url.PathEscape(version) + "/" + url.PathEscape(artifact+"-"+version) + ".pom"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("plugin marker POM returned HTTP %d", resp.StatusCode)
+	}
+	var pom struct {
+		Dependencies []struct {
+			Group    string `xml:"groupId"`
+			Artifact string `xml:"artifactId"`
+			Version  string `xml:"version"`
+		} `xml:"dependencies>dependency"`
+	}
+	if err := mavenXMLDecoder(resp.Body).Decode(&pom); err != nil {
+		return nil, err
+	}
+	if len(pom.Dependencies) != 1 {
+		return nil, fmt.Errorf("expected one implementation dependency in plugin marker POM")
+	}
+	dep := pom.Dependencies[0]
+	for _, field := range []string{dep.Group, dep.Artifact, dep.Version} {
+		if field == "" || strings.ContainsAny(field, "$[](),:+/ ") || strings.HasSuffix(field, "-SNAPSHOT") || field == "LATEST" || field == "RELEASE" {
+			return nil, fmt.Errorf("plugin marker requires literal implementation coordinates")
+		}
+	}
+	return &models.PackageVersion{Ecosystem: models.EcosystemMaven, Package: dep.Group + ":" + dep.Artifact, Version: dep.Version}, nil
+}
+
+func mavenXMLDecoder(body io.Reader) *xml.Decoder {
+	d := xml.NewDecoder(body)
+	d.CharsetReader = func(label string, input io.Reader) (io.Reader, error) {
+		if strings.EqualFold(label, "us-ascii") {
+			return input, nil
+		}
+		return nil, fmt.Errorf("unsupported Maven XML encoding %q", label)
+	}
+	return d
 }

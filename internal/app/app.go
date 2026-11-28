@@ -65,7 +65,7 @@ func (a App) CheckPackage(ctx context.Context, query models.Query) (models.Check
 		query.Version = models.LatestVersion
 	}
 
-	restriction, err := sourceRestriction(ctx, query)
+	restriction, err := prepareSources(ctx, &query)
 	if err != nil {
 		return models.CheckResult{}, err
 	}
@@ -101,7 +101,11 @@ func (a App) checkResolved(ctx context.Context, resolved registry.VersionInfo) m
 		PublishedAt: resolved.PublishedAt,
 	}
 
-	vulnResult := a.queryVulnerabilities(ctx, pkg)
+	advisoryPackage := pkg
+	if resolved.Implementation != nil {
+		advisoryPackage = *resolved.Implementation
+	}
+	vulnResult := a.queryVulnerabilities(ctx, advisoryPackage)
 	vulns := vulnResult.Vulnerabilities
 	providerErrors := vulnResult.ProviderErrors
 	sortVulnerabilities(vulns)
@@ -132,6 +136,9 @@ func (a App) checkResolved(ctx context.Context, resolved registry.VersionInfo) m
 		AdvisoryCoverage:          vulnResult.AdvisoryCoverage,
 		AdvisoryCoverageReason:    vulnResult.CoverageReason,
 		RegistryVerification:      "verified",
+	}
+	if resolved.Implementation != nil {
+		result.Summary += fmt.Sprintf(" Checked implementation %s %s.", advisoryPackage.Package, advisoryPackage.Version)
 	}
 	return result
 }
@@ -198,15 +205,21 @@ func (a App) SuggestSafeVersion(ctx context.Context, query models.Query) (models
 		return result, nil
 	}
 
+	if query.Ecosystem == models.EcosystemMaven && query.ProjectDir != "" {
+		reason, err := prepareSources(ctx, &query)
+		if err != nil {
+			return models.SuggestResult{}, err
+		}
+		if reason != "" {
+			return models.SuggestResult{}, fmt.Errorf("%s", reason)
+		}
+	}
 	resolved, err := a.registry.Resolve(ctx, query)
 	if err != nil {
 		return models.SuggestResult{}, err
 	}
-	for _, version := range preferredFixedVersions(latest.Vulnerabilities, resolved.Versions) {
-		if version == "" || version == latest.Version {
-			continue
-		}
-		candidate := a.checkResolved(ctx, registry.VersionInfo{
+	checkCandidate := func(version string) (models.CheckResult, error) {
+		candidateInfo := registry.VersionInfo{
 			Ecosystem:            resolved.Ecosystem,
 			Package:              resolved.Package,
 			Version:              version,
@@ -214,7 +227,24 @@ func (a App) SuggestSafeVersion(ctx context.Context, query models.Query) (models
 			Versions:             resolved.Versions,
 			PublishedAt:          resolved.PublishedAtByVersion[version],
 			PublishedAtByVersion: resolved.PublishedAtByVersion,
-		})
+		}
+		if resolved.Implementation != nil {
+			query.Version = version
+			candidateInfo, err = a.registry.Resolve(ctx, query)
+			if err != nil {
+				return models.CheckResult{}, err
+			}
+		}
+		return a.checkResolved(ctx, candidateInfo), nil
+	}
+	for _, version := range preferredFixedVersions(latest.Vulnerabilities, resolved.Versions) {
+		if version == "" || version == latest.Version {
+			continue
+		}
+		candidate, err := checkCandidate(version)
+		if err != nil {
+			return models.SuggestResult{}, err
+		}
 		result.CheckedVersions = appendUniqueString(result.CheckedVersions, candidate.Version)
 		result.ProviderErrors = appendProviderErrors(result.ProviderErrors, candidate.ProviderErrors)
 		result.CheckedProviders = appendUniqueStrings(result.CheckedProviders, candidate.CheckedProviders...)
@@ -232,15 +262,10 @@ func (a App) SuggestSafeVersion(ctx context.Context, query models.Query) (models
 		if version == "" || version == latest.Version || containsString(result.CheckedVersions, version) {
 			continue
 		}
-		candidate := a.checkResolved(ctx, registry.VersionInfo{
-			Ecosystem:            resolved.Ecosystem,
-			Package:              resolved.Package,
-			Version:              version,
-			Latest:               resolved.Latest,
-			Versions:             resolved.Versions,
-			PublishedAt:          resolved.PublishedAtByVersion[version],
-			PublishedAtByVersion: resolved.PublishedAtByVersion,
-		})
+		candidate, err := checkCandidate(version)
+		if err != nil {
+			return models.SuggestResult{}, err
+		}
 		result.CheckedVersions = appendUniqueString(result.CheckedVersions, candidate.Version)
 		result.ProviderErrors = appendProviderErrors(result.ProviderErrors, candidate.ProviderErrors)
 		result.CheckedProviders = appendUniqueStrings(result.CheckedProviders, candidate.CheckedProviders...)

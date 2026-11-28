@@ -79,6 +79,7 @@ func TestEffectiveGradleProjectSources(t *testing.T) {
 		blocked, warm                                        bool
 	}{
 		{name: "public cached module", repositories: "repositories { mavenCentral() }", pkg: "org.apache.commons:commons-lang3", dependency: "org.apache.commons:commons-lang3:3.20.0", warm: true},
+		{name: "selected public repository", repositories: "repositories { mavenCentral(); gradlePluginPortal() }", pkg: "org.apache.commons:commons-lang3", dependency: "org.apache.commons:commons-lang3:3.20.0", warm: true},
 		{name: "Maven mirror reuse", repositories: "repositories { mavenCentral() }", pkg: "org.apache.commons:commons-lang3", dependency: "org.apache.commons:commons-lang3:3.20.0", warm: true, blocked: true},
 		{name: "settings private", settings: `dependencyResolutionManagement { repositories { maven { url = uri('` + server.URL + `'); allowInsecureProtocol = true } } }`, pkg: "company:secret", dependency: "company:secret:1.0", blocked: true},
 		{name: "exclusive private", repositories: `repositories { mavenCentral(); exclusiveContent { forRepository { maven { url = uri('` + server.URL + `'); allowInsecureProtocol = true } }; filter { includeGroup('company') } } }`, pkg: "company:secret", dependency: "company:secret:1.0", blocked: true},
@@ -126,7 +127,10 @@ func TestEffectiveGradleProjectSources(t *testing.T) {
 				t.Setenv("JAVA_TOOL_OPTIONS", "-Duser.home="+home)
 			}
 			q := models.Query{Ecosystem: models.EcosystemMaven, Package: tt.pkg, ProjectDir: dir}
-			reason, err := sourceRestriction(context.Background(), q)
+			reason, err := prepareSources(context.Background(), &q)
+			if tt.name == "selected public repository" && (len(q.MavenRepositories) != 1 || q.MavenRepositories[0] != "https://repo.maven.apache.org/maven2") {
+				t.Fatalf("selected repositories = %v (%s, %v)", q.MavenRepositories, reason, err)
+			}
 			if err != nil || (reason != "") != tt.blocked {
 				t.Fatalf("%q %v", reason, err)
 			}
@@ -201,9 +205,11 @@ func TestJVMSourceClassification(t *testing.T) {
 		{true, []string{"https://repo.maven.apache.org/maven2/", "https://private.invalid"}, true},
 		{true, []string{"file:///private/repository"}, true},
 		{false, []string{"https://repo.maven.apache.org/maven2/"}, true},
+		{true, []string{"https://plugins.gradle.org/m2", "https://www.jetbrains.com/intellij-repository/releases"}, false},
+		{true, []string{"https://plugins.gradle.org/m2", "https://private.invalid"}, true},
 		{true, nil, true},
 	} {
-		reason, err := classifyJVMRepositories(tt.declared, tt.urls)
+		reason, err := setJVMRepositories(&models.Query{}, tt.declared, tt.urls)
 		if err != nil || (reason != "") != tt.blocked {
 			t.Fatalf("%q %v", reason, err)
 		}

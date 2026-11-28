@@ -21,6 +21,8 @@ gradle.projectsEvaluated {
         doLast {
             def requested = System.getenv('DEPTRUST_SOURCE_PACKAGE')
             def repositories = []
+            def selectedRepositories = [] as Set
+            def candidates = settingsRepositories + project.repositories.toList()
             def declared = false
             def unsupported = false
             def resolved = false
@@ -37,7 +39,7 @@ gradle.projectsEvaluated {
                         "${dependency.group}:${dependency.name}".toString() == requested
                     }
                 })
-                (settingsRepositories + project.repositories.toList()).each { repository ->
+                candidates.each { repository ->
                     if (repository instanceof MavenArtifactRepository) {
                         repositories.add(repository.url.toString())
                         repository.artifactUrls.each { repositories.add(it.toString()) }
@@ -49,7 +51,7 @@ gradle.projectsEvaluated {
             // Resolve metadata offline only when every candidate endpoint is a supported public repository.
             // Public APIs distinguish module artifacts from local substitutions.
             def publicRepositories = repositories && repositories.every { uri ->
-                uri.replaceAll('/+$', '') in ['https://repo.maven.apache.org/maven2', 'https://repo1.maven.org/maven2', 'https://dl.google.com/dl/android/maven2', 'https://maven.google.com']
+                uri.replaceAll('/+$', '') in ['https://repo.maven.apache.org/maven2', 'https://repo1.maven.org/maven2', 'https://dl.google.com/dl/android/maven2', 'https://maven.google.com', 'https://plugins.gradle.org/m2', 'https://www.jetbrains.com/intellij-repository/releases', 'https://cache-redirector.jetbrains.com/www.jetbrains.com/intellij-repository/releases']
             }
             if (declared && publicRepositories && !unsupported) {
                 try {
@@ -66,6 +68,11 @@ gradle.projectsEvaluated {
                                 unsupported = true
                             } else {
                                 resolved = true
+                                if (repositories.unique(false).size() > 1) {
+                                    def selected = candidates.findAll { it.name == edge.selected.repositoryName }
+                                    if (selected.size() != 1 || !selected.first().artifactUrls.empty) unsupported = true
+                                    else selectedRepositories.add(selected.first().url.toString())
+                                }
                             }
                         }
                     }
@@ -73,10 +80,11 @@ gradle.projectsEvaluated {
                     unsupported = true
                 }
             }
+            if (selectedRepositories.size() > 1) unsupported = true
             if (!gradle.includedBuilds.empty) unsupported = true
             new File(System.getenv('DEPTRUST_SOURCE_OUTPUT')).text = JsonOutput.toJson([
                 complete: true, declared: declared, resolved: resolved,
-                unsupported: unsupported, repositories: repositories
+                unsupported: unsupported, repositories: selectedRepositories.empty ? repositories : selectedRepositories
             ])
         }
     }

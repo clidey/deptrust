@@ -10,14 +10,15 @@ import (
 )
 
 type VersionInfo struct {
-	Ecosystem            models.Ecosystem      `json:"ecosystem"`
-	Package              string                `json:"package"`
-	Version              string                `json:"version"`
-	Latest               string                `json:"latest_version"`
-	Versions             []string              `json:"versions,omitempty"`
-	PublishedAt          *time.Time            `json:"published_at,omitempty"`
-	PublishedAtByVersion map[string]*time.Time `json:"-"`
-	Signals              []models.Signal       `json:"-"`
+	Implementation       *models.PackageVersion `json:"-"`
+	Ecosystem            models.Ecosystem       `json:"ecosystem"`
+	Package              string                 `json:"package"`
+	Version              string                 `json:"version"`
+	Latest               string                 `json:"latest_version"`
+	Versions             []string               `json:"versions,omitempty"`
+	PublishedAt          *time.Time             `json:"published_at,omitempty"`
+	PublishedAtByVersion map[string]*time.Time  `json:"-"`
+	Signals              []models.Signal        `json:"-"`
 }
 
 type Resolver interface {

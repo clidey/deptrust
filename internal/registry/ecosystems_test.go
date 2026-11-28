@@ -203,6 +203,17 @@ func TestResolveMavenExactVersionFromCanonicalMetadata(t *testing.T) {
 	}
 }
 
+func TestPluginMarkerImplementation(t *testing.T) {
+	client := fakeHTTPClient{responses: map[string]fakeResponse{
+		"/m2/example/example.gradle.plugin/maven-metadata.xml":            {status: 200, body: `<?xml version="1.0" encoding="US-ASCII"?><metadata><versioning><versions><version>1</version></versions></versioning></metadata>`},
+		"/m2/example/example.gradle.plugin/1/example.gradle.plugin-1.pom": {status: 200, body: `<project><dependencies><dependency><groupId>org.example</groupId><artifactId>impl</artifactId><version>2</version></dependency></dependencies></project>`},
+	}}
+	got, err := resolveMaven(context.Background(), client, models.Query{Package: "example:example.gradle.plugin", Version: "1"})
+	if err != nil || got.Implementation == nil || got.Implementation.Package != "org.example:impl" || got.Implementation.Version != "2" {
+		t.Fatalf("marker resolution = %+v, %v", got, err)
+	}
+}
+
 func TestResolveGoogleMaven(t *testing.T) {
 	client := fakeHTTPClient{responses: map[string]fakeResponse{
 		"/dl/android/maven2/androidx/core/core/maven-metadata.xml":     {status: 200, body: "<metadata><versioning><release>1.15.0</release><versions><version>1.15.0</version></versions></versioning></metadata>"},

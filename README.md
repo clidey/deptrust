@@ -848,8 +848,12 @@ required parent POMs, extensions, plugins, and metadata in advance. Select the
 actual project/subproject directory whose declared direct dependency is being
 checked. Arbitrary transitive queries and undeclared modules remain `unknown`.
 
-DepTrust checks Maven Central first and tries Google Maven when Central returns a package 404.
-Project assessments require every effective repository to be Maven Central or Google Maven. Custom,
+DepTrust supports Maven Central, Google Maven, the Gradle Plugin Portal, and JetBrains IntelliJ Platform Releases.
+Standalone checks try those repositories in order after package 404s. Gradle plugin marker
+coordinates try the Portal first. DepTrust reads the marker POM for the requested version
+and checks its implementation coordinates against advisory providers.
+Project checks use the inspected public repositories. Gradle uses the selected repository
+when it can establish one during offline module resolution. Custom,
 mixed, Ivy/local, or uncertain source sets return `unknown`, including mixed
 Gradle repositories where a content filter might exclude the private source for
 this particular module. The implementation does not use internal filter APIs or
